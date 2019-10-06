@@ -1,0 +1,12 @@
+[package]
+name = "named-binary-tag"
+version = "0.1.0"
+authors = ["vagola <vladislavs.golubs@yandex.ru>"]
+edition = "2018"
+license = "MIT"
+homepage = "https://github.com/eihwaz/named-binary-tag"
+repository = "https://github.com/eihwaz/named-binary-tag"
+keywords = ["minecraft", "nbt", "io"]
+
+[lib]
+name = "nbt"
