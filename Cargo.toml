@@ -10,3 +10,6 @@ keywords = ["minecraft", "nbt", "io"]
 
 [lib]
 name = "nbt"
+
+[dependencies]
+byteorder = "1.3"
