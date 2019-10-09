@@ -1,7 +1,7 @@
 use std::collections::HashMap;
 
 /// All possible types of tags.
-enum Tag {
+pub enum Tag<'a> {
     Byte(i8),
     Short(i16),
     Int(i32),
@@ -9,14 +9,14 @@ enum Tag {
     Float(f32),
     Double(f64),
     ByteArray(Vec<i8>),
-    String(String),
-    List(Vec<Tag>),
-    Compound(TagCompound),
+    String(&'a str),
+    List(Vec<Tag<'a>>),
+    Compound(HashMap<String, Tag<'a>>),
     IntArray(Vec<i32>),
     LongArray(Vec<i64>),
 }
 
-impl Tag {
+impl<'a> Tag<'a> {
     /// Returns tag id.
     fn id(&self) -> u8 {
         match self {
@@ -34,77 +34,138 @@ impl Tag {
             Tag::LongArray(_) => 12,
         }
     }
+
+    pub fn as_i8(&self) -> Option<i8> {
+        match self {
+            Tag::Byte(value) => Some(*value),
+            _ => None,
+        }
+    }
+
+    pub fn as_bool(&self) -> Option<bool> {
+        Some(self.as_i8()? == 1)
+    }
+
+    pub fn as_i16(&self) -> Option<i16> {
+        match self {
+            Tag::Short(value) => Some(*value),
+            _ => None,
+        }
+    }
+
+    pub fn as_i32(&self) -> Option<i32> {
+        match self {
+            Tag::Int(value) => Some(*value),
+            _ => None,
+        }
+    }
+
+    pub fn as_i64(&self) -> Option<i64> {
+        match self {
+            Tag::Long(value) => Some(*value),
+            _ => None,
+        }
+    }
+
+    fn as_f32(&self) -> Option<f32> {
+        match self {
+            Tag::Float(value) => Some(*value),
+            _ => None,
+        }
+    }
+
+    pub fn as_f64(&self) -> Option<f64> {
+        match self {
+            Tag::Double(value) => Some(*value),
+            _ => None,
+        }
+    }
+
+    pub fn as_i8_vec(&self) -> Option<&Vec<i8>> {
+        match self {
+            Tag::ByteArray(value) => Some(value),
+            _ => None,
+        }
+    }
+
+    pub fn as_str(&self) -> Option<&'a str> {
+        match self {
+            Tag::String(value) => Some(value),
+            _ => None,
+        }
+    }
+
+    fn as_vec(&self) -> Option<&Vec<Tag>> {
+        match self {
+            Tag::List(value) => Some(value),
+            _ => None,
+        }
+    }
+
+    pub fn as_str_vec(&'a self) -> Option<Vec<&'a str>> {
+        let vec = self
+            .as_vec()?
+            .iter()
+            .filter_map(|tag| tag.as_str())
+            .collect();
+
+        return Some(vec);
+    }
+
+    pub fn as_map_vec(&'a self) -> Option<Vec<&HashMap<String, Tag<'a>>>> {
+        let vec = self
+            .as_vec()?
+            .iter()
+            .filter_map(|tag| tag.as_map())
+            .collect();
+
+        return Some(vec);
+    }
+
+    pub fn as_map(&self) -> Option<&HashMap<String, Tag<'a>>> {
+        match self {
+            Tag::Compound(value) => Some(value),
+            _ => None,
+        }
+    }
+
+    pub fn as_i32_vec(&self) -> Option<&Vec<i32>> {
+        match self {
+            Tag::IntArray(value) => Some(value),
+            _ => None,
+        }
+    }
+
+    pub fn as_i64_vec(&self) -> Option<&Vec<i64>> {
+        match self {
+            Tag::LongArray(value) => Some(value),
+            _ => None,
+        }
+    }
 }
 
-pub struct TagCompound {
-    tags: HashMap<String, Tag>,
-}
-
-impl TagCompound {
-    pub fn get_byte(&self, name: &str) -> Option<i8> {
-        if let Some(Tag::Byte(value)) = self.tags.get(name) {
-            return Some(*value);
-        }
-
-        None
-    }
-
-    pub fn get_boolean(&self, name: &str) -> Option<bool> {
-        let byte = self.get_byte(name)?;
-        Some(byte == 1)
-    }
-
-    pub fn get_string(&self, name: &str) -> Option<&str> {
-        if let Some(Tag::String(value)) = self.tags.get(name) {
-            return Some(&value);
-        }
-
-        None
-    }
-
-    pub fn get_compound(&self, name: &str) -> Option<&TagCompound> {
-        if let Some(Tag::Compound(value)) = self.tags.get(name) {
-            return Some(&value);
-        }
-
-        None
-    }
-
-    pub fn get_compound_list(&self, name: &str) -> Option<Vec<&TagCompound>> {
-        if let Some(Tag::List(tags)) = self.tags.get(name) {
-            let mut vec = Vec::new();
-
-            for tag in tags {
-                if let Tag::Compound(value) = tag {
-                    vec.push(value)
-                }
-            }
-
-            return Some(vec);
-        }
-
-        None
-    }
-}
-
-pub fn read_from_vec(vec: Vec<u8>) -> TagCompound {
-    TagCompound {
-        tags: Default::default(),
-    }
+pub fn read_from_vec<'a>(_vec: Vec<u8>) -> Tag<'a> {
+    Tag::Compound(HashMap::new())
 }
 
 #[test]
 fn test_servers_read() {
     let vec = include_bytes!("../test/servers.dat").to_vec();
     let root_tag = read_from_vec(vec);
+    let servers = root_tag
+        .as_map()
+        .unwrap()
+        .get("servers")
+        .unwrap()
+        .as_map_vec()
+        .unwrap();
 
-    let servers = root_tag.get_compound_list("servers").unwrap();
     assert_eq!(servers.len(), 1);
 
     let server = servers.get(0).unwrap();
-    let ip = server.get_string("ip").unwrap();
-    let name = server.get_string("name").unwrap();
-    let hide_address = server.get_boolean("hideAddress").unwrap();
+    let ip = server.get("ip").unwrap().as_str().unwrap();
+    let name = server.get("name").unwrap().as_str().unwrap();
+    let hide_address = server.get("hideAddress").unwrap().as_bool().unwrap();
 
     assert_eq!(ip, "localhost:25565");
     assert_eq!(name, "Minecraft Server");
