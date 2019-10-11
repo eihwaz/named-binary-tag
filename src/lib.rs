@@ -172,6 +172,30 @@ impl<'a> CompoundTag<'a> {
 
         Ok(vec)
     }
+
+    pub fn set_compound_tag_vec(&mut self, name: &'a str, vec: Vec<CompoundTag<'a>>) {
+        let mut tags = Vec::new();
+
+        for value in vec {
+            tags.push(Tag::Compound(value));
+        }
+
+        self.tags.insert(name, Tag::List(tags));
+    }
+
+    pub fn get_compound_tag_vec(&self, name: &str) -> Result<Vec<&'a CompoundTag>, TagError> {
+        let tags = self.get_vec(name)?;
+        let mut vec = Vec::new();
+
+        for tag in tags {
+            match tag {
+                Tag::Compound(value) => vec.push(value),
+                _ => return Err(TagError::WrongType),
+            }
+        }
+
+        Ok(vec)
+    }
 }
 
 #[test]
@@ -298,5 +322,32 @@ fn test_compound_tag_str_vec() {
 
     compound_tag.set_str_vec("str_vec", set_str_vec);
 
-    let get_str_vec = compound_tag.get_str_vec("str_vec");
+    let get_str_vec = compound_tag.get_str_vec("str_vec").unwrap();
+    assert_eq!(get_str_vec[0], "a");
+    assert_eq!(get_str_vec[1], "b");
+    assert_eq!(get_str_vec[2], "c");
+}
+
+#[test]
+fn test_compound_tag_nested_compound_tag_vec() {
+    let mut compound_tag = CompoundTag::new();
+    let mut set_nested_compound_tag_1 = CompoundTag::new();
+    let mut set_nested_compound_tag_2 = CompoundTag::new();
+
+    set_nested_compound_tag_1.set_str("str", "test");
+    set_nested_compound_tag_2.set_i32("i32", 222333111);
+
+    let set_nested_compound_tag_vec = vec![set_nested_compound_tag_1, set_nested_compound_tag_2];
+
+    compound_tag.set_compound_tag_vec("nested_compound_tag_vec", set_nested_compound_tag_vec);
+
+    let get_nested_compound_tag_vec = compound_tag
+        .get_compound_tag_vec("nested_compound_tag_vec")
+        .unwrap();
+
+    let get_nested_compound_tag_1 = get_nested_compound_tag_vec[0];
+    let get_nested_compound_tag_2 = get_nested_compound_tag_vec[1];
+
+    assert_eq!(get_nested_compound_tag_1.get_str("str").unwrap(), "test");
+    assert_eq!(get_nested_compound_tag_2.get_i32("i32").unwrap(), 222333111);
 }
