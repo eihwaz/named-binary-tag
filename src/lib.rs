@@ -1,4 +1,5 @@
 use std::collections::HashMap;
+use std::io::{Cursor, Read, Write};
 
 #[derive(Debug)]
 pub enum TagError {
@@ -198,6 +199,17 @@ impl<'a> CompoundTag<'a> {
     }
 }
 
+pub fn read_compound_tag<'a, R: Read>(reader: &mut R) -> Result<CompoundTag<'a>, TagError> {
+    Ok(CompoundTag::new())
+}
+
+pub fn write_compound_tag<W: Write>(
+    writer: &mut W,
+    compound_tag: CompoundTag,
+) -> Result<(), TagError> {
+    Ok(())
+}
+
 #[test]
 fn test_compound_tag_i8() {
     let mut compound_tag = CompoundTag::new();
@@ -350,4 +362,42 @@ fn test_compound_tag_nested_compound_tag_vec() {
 
     assert_eq!(get_nested_compound_tag_1.get_str("str").unwrap(), "test");
     assert_eq!(get_nested_compound_tag_2.get_i32("i32").unwrap(), 222333111);
+}
+
+#[test]
+fn test_servers_read() {
+    let cursor = Cursor::new(include_bytes!("../test/servers.dat").to_vec());
+    let root_tag = read_compound_tag(cursor);
+
+    let servers = root_tag.get_compound_tag_vec("servers").unwrap();
+    assert_eq!(servers.len(), 1);
+
+    let server = servers[0];
+    let ip = server.get_str("ip").unwrap();
+    let name = server.get_str("name").unwrap();
+    let hide_address = server.get_bool("hideAddress").unwrap();
+
+    assert_eq!(ip, "localhost:25565");
+    assert_eq!(name, "Minecraft Server");
+    assert!(hide_address);
+}
+
+#[test]
+fn test_servers_write() {
+    let mut server = CompoundTag::new();
+
+    server.set_str("ip", "localhost:25565");
+    server.set_str("name", "Minecraft Server");
+    server.set_bool("hideAddress", true);
+
+    let mut servers = Vec::new();
+    servers.push(server);
+
+    let mut root_tag = CompoundTag::new();
+    root_tag.set_compound_tag_vec("servers", servers);
+
+    let vec = Vec::new();
+    write_compound_tag(&vec, root_tag);
+
+    assert_eq!(vec, include_bytes!("../test/servers.dat").to_vec());
 }
