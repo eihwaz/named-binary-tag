@@ -2,6 +2,7 @@
 name = "named-binary-tag"
 version = "0.1.0"
 authors = ["vagola <vladislavs.golubs@yandex.ru>"]
+description = "Format is used by minecraft for the various files in which it saves data"
 edition = "2018"
 license = "MIT"
 homepage = "https://github.com/eihwaz/named-binary-tag"
