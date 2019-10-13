@@ -1,5 +1,5 @@
-use byteorder::{BigEndian, ReadBytesExt};
-use std::collections::HashMap;
+use byteorder::{BigEndian, ReadBytesExt, WriteBytesExt};
+use linked_hash_map::LinkedHashMap;
 use std::io::{Cursor, Read, Write};
 
 #[derive(Debug)]
@@ -51,7 +51,7 @@ impl Tag {
 
 #[derive(Debug)]
 pub struct CompoundTag {
-    tags: HashMap<String, Tag>,
+    tags: LinkedHashMap<String, Tag>,
 }
 
 macro_rules! define_primitive_type (
@@ -93,7 +93,7 @@ macro_rules! define_array_type (
 impl CompoundTag {
     pub fn new() -> Self {
         CompoundTag {
-            tags: HashMap::new(),
+            tags: LinkedHashMap::new(),
         }
     }
 
@@ -212,7 +212,7 @@ impl CompoundTag {
 
 pub fn read_compound_tag<'a, R: Read>(reader: &mut R) -> Result<CompoundTag, TagError<'a>> {
     let tag_id = reader.read_u8().unwrap();
-    let (name, tag) = read_tag(tag_id, reader, true)?;
+    let (_, tag) = read_tag(tag_id, reader, true)?;
 
     match tag {
         Tag::Compound(value) => Ok(value),
@@ -298,7 +298,7 @@ fn read_tag<'a, R: Read>(
             let mut value = Vec::new();
 
             for _ in 0..length {
-                let (name, tag) = read_tag(list_tags_id, reader, false)?;
+                let (_, tag) = read_tag(list_tags_id, reader, false)?;
                 value.push(tag);
             }
 
@@ -307,7 +307,7 @@ fn read_tag<'a, R: Read>(
             return Ok((name, tag));
         }
         10 => {
-            let mut tags = HashMap::new();
+            let mut tags = LinkedHashMap::new();
 
             loop {
                 let tag_id = reader.read_u8().unwrap();
@@ -352,21 +352,96 @@ fn read_tag<'a, R: Read>(
         }
         type_id => return Err(TagError::UnknownType { type_id }),
     }
+}
 
-    fn read_string<R: Read>(reader: &mut R) -> String {
-        let length = reader.read_u16::<BigEndian>().unwrap();
-        let mut buf = vec![0; length as usize];
-        reader.read_exact(&mut buf);
+fn read_string<R: Read>(reader: &mut R) -> String {
+    let length = reader.read_u16::<BigEndian>().unwrap();
+    let mut buf = vec![0; length as usize];
+    reader.read_exact(&mut buf).unwrap();
 
-        String::from_utf8_lossy(&buf).into_owned()
-    }
+    String::from_utf8_lossy(&buf).into_owned()
 }
 
 pub fn write_compound_tag<'a, W: Write>(
     writer: &mut W,
     compound_tag: CompoundTag,
 ) -> Result<(), TagError<'a>> {
+    write_tag(writer, String::from(""), Tag::Compound(compound_tag), true)
+}
+
+fn write_tag<'a, W: Write>(
+    writer: &mut W,
+    name: String,
+    tag: Tag,
+    write_header: bool,
+) -> Result<(), TagError<'a>> {
+    if write_header {
+        writer.write_u8(tag.id()).unwrap();
+        write_string(writer, name);
+    }
+
+    println!("tag {:?}", tag);
+
+    match tag {
+        Tag::Byte(value) => writer.write_i8(value).unwrap(),
+        Tag::Short(value) => writer.write_i16::<BigEndian>(value).unwrap(),
+        Tag::Int(value) => writer.write_i32::<BigEndian>(value).unwrap(),
+        Tag::Long(value) => writer.write_i64::<BigEndian>(value).unwrap(),
+        Tag::Float(value) => writer.write_f32::<BigEndian>(value).unwrap(),
+        Tag::Double(value) => writer.write_f64::<BigEndian>(value).unwrap(),
+        Tag::ByteArray(value) => {
+            writer.write_u32::<BigEndian>(value.len() as u32).unwrap();
+
+            for v in value {
+                writer.write_i8(v).unwrap();
+            }
+        }
+        Tag::String(value) => write_string(writer, value),
+        Tag::List(value) => {
+            if value.len() > 0 {
+                writer.write_u8(value[0].id()).unwrap()
+            } else {
+                writer.write_u8(Tag::End.id()).unwrap()
+            }
+
+            println!("len {}", value[0].id());
+
+            writer.write_u32::<BigEndian>(value.len() as u32).unwrap();
+
+            for tag in value {
+                write_tag(writer, String::from(""), tag, false)?;
+            }
+        }
+        Tag::Compound(value) => {
+            for (name, tag) in value.tags {
+                write_tag(writer, name, tag, true)?;
+            }
+
+            writer.write_u8(Tag::End.id()).unwrap();
+        }
+        Tag::IntArray(value) => {
+            writer.write_u32::<BigEndian>(value.len() as u32).unwrap();
+
+            for v in value {
+                writer.write_i32::<BigEndian>(v).unwrap();
+            }
+        }
+        Tag::LongArray(value) => {
+            writer.write_u32::<BigEndian>(value.len() as u32).unwrap();
+
+            for v in value {
+                writer.write_i64::<BigEndian>(v).unwrap();
+            }
+        }
+        _ => return Err(TagError::UnknownType { type_id: tag.id() }),
+    }
+
     Ok(())
+}
+
+fn write_string<W: Write>(writer: &mut W, value: String) {
+    writer.write_u16::<BigEndian>(value.len() as u16).unwrap();
+    writer.write(value.as_bytes()).unwrap();
 }
 
 #[test]
