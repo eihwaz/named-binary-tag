@@ -1,14 +1,19 @@
+use byteorder::{BigEndian, ReadBytesExt};
 use std::collections::HashMap;
 use std::io::{Cursor, Read, Write};
 
 #[derive(Debug)]
-pub enum TagError {
-    NotFound,
+pub enum TagError<'a> {
+    NotFound { key: &'a str },
     WrongType,
+    UnknownType { type_id: u8 },
+    ExpectedCompoundTag { unexpected_tag_id: u8 },
 }
 
 /// Possible types of tags.
-enum Tag<'a> {
+#[derive(Debug)]
+enum Tag {
+    End,
     Byte(i8),
     Short(i16),
     Int(i32),
@@ -16,17 +21,18 @@ enum Tag<'a> {
     Float(f32),
     Double(f64),
     ByteArray(Vec<i8>),
-    String(&'a str),
-    List(Vec<Tag<'a>>),
-    Compound(CompoundTag<'a>),
+    String(String),
+    List(Vec<Tag>),
+    Compound(CompoundTag),
     IntArray(Vec<i32>),
     LongArray(Vec<i64>),
 }
 
-impl<'a> Tag<'a> {
+impl Tag {
     /// Returns tag id.
     fn id(&self) -> u8 {
         match self {
+            Tag::End => 0,
             Tag::Byte(_) => 1,
             Tag::Short(_) => 2,
             Tag::Int(_) => 3,
@@ -43,23 +49,24 @@ impl<'a> Tag<'a> {
     }
 }
 
-pub struct CompoundTag<'a> {
-    tags: HashMap<&'a str, Tag<'a>>,
+#[derive(Debug)]
+pub struct CompoundTag {
+    tags: HashMap<String, Tag>,
 }
 
 macro_rules! define_primitive_type (
     ($type: ident, $tag: ident, $getter_name: ident, $setter_name: ident) => (
-        pub fn $setter_name(&mut self, name: &'a str, value: $type) {
-            self.tags.insert(name, Tag::$tag(value));
+        pub fn $setter_name(&mut self, name: &str, value: $type) {
+            self.tags.insert(name.to_owned(), Tag::$tag(value));
         }
 
-        pub fn $getter_name(&self, name: &str) -> Result<$type, TagError> {
+        pub fn $getter_name<'a>(&self, name: &'a str) -> Result<$type, TagError<'a>> {
             match self.tags.get(name) {
                 Some(tag) => match tag {
                     Tag::$tag(value) => Ok(*value),
                     _ => Err(TagError::WrongType),
                 },
-                None => Err(TagError::NotFound),
+                None => Err(TagError::NotFound { key: name }),
             }
         }
    );
@@ -67,23 +74,23 @@ macro_rules! define_primitive_type (
 
 macro_rules! define_array_type (
     ($type: ident, $tag: ident, $getter_name: ident, $setter_name: ident) => (
-        pub fn $setter_name(&mut self, name: &'a str, value: Vec<$type>) {
-            self.tags.insert(name, Tag::$tag(value));
+        pub fn $setter_name(&mut self, name: &str, value: Vec<$type>) {
+            self.tags.insert(name.to_owned(), Tag::$tag(value));
         }
 
-        pub fn $getter_name(&self, name: &str) -> Result<&Vec<$type>, TagError> {
+        pub fn $getter_name<'a>(&self, name: &'a str) -> Result<&Vec<$type>, TagError<'a>> {
             match self.tags.get(name) {
                 Some(tag) => match tag {
                     Tag::$tag(value) => Ok(value),
                     _ => Err(TagError::WrongType),
                 },
-                None => Err(TagError::NotFound),
+                None => Err(TagError::NotFound { key: name }),
             }
         }
    );
 );
 
-impl<'a> CompoundTag<'a> {
+impl CompoundTag {
     pub fn new() -> Self {
         CompoundTag {
             tags: HashMap::new(),
@@ -100,7 +107,7 @@ impl<'a> CompoundTag<'a> {
     define_array_type!(i32, IntArray, get_i32_vec, set_i32_vec);
     define_array_type!(i64, LongArray, get_i64_vec, set_i64_vec);
 
-    pub fn set_bool(&mut self, name: &'a str, value: bool) {
+    pub fn set_bool(&mut self, name: &str, value: bool) {
         if value {
             self.set_i8(name, 1);
         } else {
@@ -108,65 +115,66 @@ impl<'a> CompoundTag<'a> {
         }
     }
 
-    pub fn get_bool(&self, name: &str) -> Result<bool, TagError> {
+    pub fn get_bool<'a>(&self, name: &'a str) -> Result<bool, TagError<'a>> {
         Ok(self.get_i8(name)? == 1)
     }
 
-    pub fn set_str(&mut self, name: &'a str, value: &'a str) {
-        self.tags.insert(name, Tag::String(value));
+    pub fn set_str(&mut self, name: &str, value: &str) {
+        self.tags
+            .insert(name.to_owned(), Tag::String(value.to_owned()));
     }
 
-    pub fn get_str(&self, name: &str) -> Result<&'a str, TagError> {
+    pub fn get_str<'a>(&self, name: &'a str) -> Result<String, TagError<'a>> {
         match self.tags.get(name) {
             Some(tag) => match tag {
-                Tag::String(value) => Ok(value),
+                Tag::String(value) => Ok(value.to_owned()),
                 _ => Err(TagError::WrongType),
             },
-            None => Err(TagError::NotFound),
+            None => Err(TagError::NotFound { key: name }),
         }
     }
 
-    pub fn set_compound_tag(&mut self, name: &'a str, value: CompoundTag<'a>) {
-        self.tags.insert(name, Tag::Compound(value));
+    pub fn set_compound_tag(&mut self, name: &str, value: CompoundTag) {
+        self.tags.insert(name.to_owned(), Tag::Compound(value));
     }
 
-    pub fn get_compound_tag(&self, name: &str) -> Result<&'a CompoundTag, TagError> {
+    pub fn get_compound_tag<'a>(&self, name: &'a str) -> Result<&CompoundTag, TagError<'a>> {
         match self.tags.get(name) {
             Some(tag) => match tag {
                 Tag::Compound(value) => Ok(value),
                 _ => Err(TagError::WrongType),
             },
-            None => Err(TagError::NotFound),
+            None => Err(TagError::NotFound { key: name }),
         }
     }
 
-    fn get_vec(&self, name: &str) -> Result<&Vec<Tag<'a>>, TagError> {
+    fn get_vec<'a>(&self, name: &'a str) -> Result<&Vec<Tag>, TagError<'a>> {
         match self.tags.get(name) {
             Some(tag) => match tag {
                 Tag::List(value) => Ok(value),
                 _ => Err(TagError::WrongType),
             },
-            None => Err(TagError::NotFound),
+            None => Err(TagError::NotFound { key: name }),
         }
     }
 
-    pub fn set_str_vec(&mut self, name: &'a str, vec: Vec<&'a str>) {
+    pub fn set_str_vec(&mut self, name: &str, vec: Vec<&str>) {
         let mut tags = Vec::new();
 
         for value in vec {
-            tags.push(Tag::String(value));
+            tags.push(Tag::String(value.to_owned()));
         }
 
-        self.tags.insert(name, Tag::List(tags));
+        self.tags.insert(name.to_owned(), Tag::List(tags));
     }
 
-    pub fn get_str_vec(&self, name: &str) -> Result<Vec<&'a str>, TagError> {
+    pub fn get_str_vec<'a>(&self, name: &'a str) -> Result<Vec<&str>, TagError<'a>> {
         let tags = self.get_vec(name)?;
         let mut vec = Vec::new();
 
         for tag in tags {
             match tag {
-                Tag::String(value) => vec.push(*value),
+                Tag::String(value) => vec.push(value.as_str()),
                 _ => return Err(TagError::WrongType),
             }
         }
@@ -174,17 +182,20 @@ impl<'a> CompoundTag<'a> {
         Ok(vec)
     }
 
-    pub fn set_compound_tag_vec(&mut self, name: &'a str, vec: Vec<CompoundTag<'a>>) {
+    pub fn set_compound_tag_vec(&mut self, name: &str, vec: Vec<CompoundTag>) {
         let mut tags = Vec::new();
 
         for value in vec {
             tags.push(Tag::Compound(value));
         }
 
-        self.tags.insert(name, Tag::List(tags));
+        self.tags.insert(name.to_owned(), Tag::List(tags));
     }
 
-    pub fn get_compound_tag_vec(&self, name: &str) -> Result<Vec<&'a CompoundTag>, TagError> {
+    pub fn get_compound_tag_vec<'a>(
+        &self,
+        name: &'a str,
+    ) -> Result<Vec<&CompoundTag>, TagError<'a>> {
         let tags = self.get_vec(name)?;
         let mut vec = Vec::new();
 
@@ -199,14 +210,162 @@ impl<'a> CompoundTag<'a> {
     }
 }
 
-pub fn read_compound_tag<'a, R: Read>(reader: &mut R) -> Result<CompoundTag<'a>, TagError> {
-    Ok(CompoundTag::new())
+pub fn read_compound_tag<'a, R: Read>(reader: &mut R) -> Result<CompoundTag, TagError<'a>> {
+    let tag_id = reader.read_u8().unwrap();
+    let (name, tag) = read_tag(tag_id, reader, true)?;
+
+    match tag {
+        Tag::Compound(value) => Ok(value),
+        _ => Err(TagError::ExpectedCompoundTag {
+            unexpected_tag_id: tag.id(),
+        }),
+    }
 }
 
-pub fn write_compound_tag<W: Write>(
+fn read_tag<'a, R: Read>(
+    id: u8,
+    reader: &mut R,
+    read_name: bool,
+) -> Result<(String, Tag), TagError<'a>> {
+    if id == 0 {
+        return Ok(("".to_owned(), Tag::End));
+    }
+
+    let name = if read_name {
+        read_string(reader)
+    } else {
+        String::from("")
+    };
+
+    match id {
+        1 => {
+            let value = reader.read_i8().unwrap();
+            let tag = Tag::Byte(value);
+
+            return Ok((name, tag));
+        }
+        2 => {
+            let value = reader.read_i16::<BigEndian>().unwrap();
+            let tag = Tag::Short(value);
+
+            return Ok((name, tag));
+        }
+        3 => {
+            let value = reader.read_i32::<BigEndian>().unwrap();
+            let tag = Tag::Int(value);
+
+            return Ok((name, tag));
+        }
+        4 => {
+            let value = reader.read_i64::<BigEndian>().unwrap();
+            let tag = Tag::Long(value);
+
+            return Ok((name, tag));
+        }
+        5 => {
+            let value = reader.read_f32::<BigEndian>().unwrap();
+            let tag = Tag::Float(value);
+
+            return Ok((name, tag));
+        }
+        6 => {
+            let value = reader.read_f64::<BigEndian>().unwrap();
+            let tag = Tag::Double(value);
+
+            return Ok((name, tag));
+        }
+        7 => {
+            let length = reader.read_u32::<BigEndian>().unwrap();
+            let mut value = Vec::new();
+
+            for _ in 0..length {
+                value.push(reader.read_i8().unwrap());
+            }
+
+            let tag = Tag::ByteArray(value);
+
+            return Ok((name, tag));
+        }
+        8 => {
+            let value = read_string(reader);
+            let tag = Tag::String(value);
+
+            return Ok((name, tag));
+        }
+        9 => {
+            let list_tags_id = reader.read_u8().unwrap();
+            let length = reader.read_u32::<BigEndian>().unwrap();
+            let mut value = Vec::new();
+
+            for _ in 0..length {
+                let (name, tag) = read_tag(list_tags_id, reader, false)?;
+                value.push(tag);
+            }
+
+            let tag = Tag::List(value);
+
+            return Ok((name, tag));
+        }
+        10 => {
+            let mut tags = HashMap::new();
+
+            loop {
+                let tag_id = reader.read_u8().unwrap();
+                let (name, tag) = read_tag(tag_id, reader, true)?;
+
+                match tag {
+                    Tag::End => break,
+                    _ => {
+                        tags.insert(name, tag);
+                    }
+                }
+            }
+
+            let compound_tag = CompoundTag { tags };
+            let tag = Tag::Compound(compound_tag);
+
+            return Ok((name, tag));
+        }
+        11 => {
+            let length = reader.read_u32::<BigEndian>().unwrap();
+            let mut value = Vec::new();
+
+            for _ in 0..length {
+                value.push(reader.read_i32::<BigEndian>().unwrap());
+            }
+
+            let tag = Tag::IntArray(value);
+
+            return Ok((name, tag));
+        }
+        12 => {
+            let length = reader.read_u32::<BigEndian>().unwrap();
+            let mut value = Vec::new();
+
+            for _ in 0..length {
+                value.push(reader.read_i64::<BigEndian>().unwrap());
+            }
+
+            let tag = Tag::LongArray(value);
+
+            return Ok((name, tag));
+        }
+        type_id => return Err(TagError::UnknownType { type_id }),
+    }
+
+    fn read_string<R: Read>(reader: &mut R) -> String {
+        let length = reader.read_u16::<BigEndian>().unwrap();
+        let mut buf = vec![0; length as usize];
+        reader.read_exact(&mut buf);
+
+        String::from_utf8_lossy(&buf).into_owned()
+    }
+}
+
+pub fn write_compound_tag<'a, W: Write>(
     writer: &mut W,
     compound_tag: CompoundTag,
-) -> Result<(), TagError> {
+) -> Result<(), TagError<'a>> {
     Ok(())
 }
 
@@ -366,8 +525,8 @@ fn test_compound_tag_nested_compound_tag_vec() {
 
 #[test]
 fn test_servers_read() {
-    let cursor = Cursor::new(include_bytes!("../test/servers.dat").to_vec());
-    let root_tag = read_compound_tag(cursor);
+    let mut cursor = Cursor::new(include_bytes!("../test/servers.dat").to_vec());
+    let root_tag = read_compound_tag(&mut cursor).unwrap();
 
     let servers = root_tag.get_compound_tag_vec("servers").unwrap();
     assert_eq!(servers.len(), 1);
@@ -396,8 +555,8 @@ fn test_servers_write() {
     let mut root_tag = CompoundTag::new();
     root_tag.set_compound_tag_vec("servers", servers);
 
-    let vec = Vec::new();
-    write_compound_tag(&vec, root_tag);
+    let mut vec = Vec::new();
+    write_compound_tag(&mut vec, root_tag).unwrap();
 
     assert_eq!(vec, include_bytes!("../test/servers.dat").to_vec());
 }
