@@ -380,8 +380,6 @@ fn write_tag<'a, W: Write>(
         write_string(writer, name);
     }
 
-    println!("tag {:?}", tag);
-
     match tag {
         Tag::Byte(value) => writer.write_i8(value).unwrap(),
         Tag::Short(value) => writer.write_i16::<BigEndian>(value).unwrap(),
@@ -403,8 +401,6 @@ fn write_tag<'a, W: Write>(
             } else {
                 writer.write_u8(Tag::End.id()).unwrap()
             }
-
-            println!("len {}", value[0].id());
 
             writer.write_u32::<BigEndian>(value.len() as u32).unwrap();
 
