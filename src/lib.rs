@@ -3,17 +3,9 @@ use linked_hash_map::LinkedHashMap;
 pub mod decode;
 pub mod encode;
 
+/// Possible types of tags and they payload.
 #[derive(Debug)]
-pub enum TagError<'a> {
-    NotFound { key: &'a str },
-    WrongType,
-    UnknownType { type_id: u8 },
-    ExpectedCompoundTag { unexpected_tag_id: u8 },
-}
-
-/// Possible types of tags.
-#[derive(Debug)]
-enum Tag {
+pub enum Tag {
     End,
     Byte(i8),
     Short(i16),
@@ -30,7 +22,6 @@ enum Tag {
 }
 
 impl Tag {
-    /// Returns tag id.
     fn id(&self) -> u8 {
         match self {
             Tag::End => 0,
@@ -55,19 +46,36 @@ pub struct CompoundTag {
     tags: LinkedHashMap<String, Tag>,
 }
 
+/// Possible types of errors while trying to get value from compound tag.
+#[derive(Debug)]
+pub enum CompoundTagError<'a> {
+    /// Tag with provided name not found.
+    TagNotFound {
+        /// Name of tag which was not found.
+        name: &'a str,
+    },
+    /// Tag actual type not match expected.
+    TagWrongType {
+        /// Name of tag which type not matched.
+        name: &'a str,
+        /// Actual tag.
+        actual_tag: &'a Tag,
+    },
+}
+
 macro_rules! define_primitive_type (
     ($type: ident, $tag: ident, $getter_name: ident, $setter_name: ident) => (
         pub fn $setter_name(&mut self, name: &str, value: $type) {
             self.tags.insert(name.to_owned(), Tag::$tag(value));
         }
 
-        pub fn $getter_name<'a>(&self, name: &'a str) -> Result<$type, TagError<'a>> {
+        pub fn $getter_name<'a>(&'a self, name: &'a str) -> Result<$type, CompoundTagError<'a>> {
             match self.tags.get(name) {
                 Some(tag) => match tag {
                     Tag::$tag(value) => Ok(*value),
-                    _ => Err(TagError::WrongType),
+                    actual_tag => Err(CompoundTagError::TagWrongType { name, actual_tag }),
                 },
-                None => Err(TagError::NotFound { key: name }),
+                None => Err(CompoundTagError::TagNotFound { name }),
             }
         }
    );
@@ -79,13 +87,13 @@ macro_rules! define_array_type (
             self.tags.insert(name.to_owned(), Tag::$tag(value));
         }
 
-        pub fn $getter_name<'a>(&self, name: &'a str) -> Result<&Vec<$type>, TagError<'a>> {
+        pub fn $getter_name<'a>(&'a self, name: &'a str) -> Result<&Vec<$type>, CompoundTagError<'a>> {
             match self.tags.get(name) {
                 Some(tag) => match tag {
                     Tag::$tag(value) => Ok(value),
-                    _ => Err(TagError::WrongType),
+                 actual_tag => Err(CompoundTagError::TagWrongType { name, actual_tag }),
                 },
-                None => Err(TagError::NotFound { key: name }),
+                None => Err(CompoundTagError::TagNotFound { name }),
             }
         }
    );
@@ -116,7 +124,7 @@ impl CompoundTag {
         }
     }
 
-    pub fn get_bool<'a>(&self, name: &'a str) -> Result<bool, TagError<'a>> {
+    pub fn get_bool<'a>(&'a self, name: &'a str) -> Result<bool, CompoundTagError<'a>> {
         Ok(self.get_i8(name)? == 1)
     }
 
@@ -125,13 +133,13 @@ impl CompoundTag {
             .insert(name.to_owned(), Tag::String(value.to_owned()));
     }
 
-    pub fn get_str<'a>(&self, name: &'a str) -> Result<String, TagError<'a>> {
+    pub fn get_str<'a>(&'a self, name: &'a str) -> Result<String, CompoundTagError<'a>> {
         match self.tags.get(name) {
             Some(tag) => match tag {
                 Tag::String(value) => Ok(value.to_owned()),
-                _ => Err(TagError::WrongType),
+                actual_tag => Err(CompoundTagError::TagWrongType { name, actual_tag }),
             },
-            None => Err(TagError::NotFound { key: name }),
+            None => Err(CompoundTagError::TagNotFound { name }),
         }
     }
 
@@ -139,23 +147,26 @@ impl CompoundTag {
         self.tags.insert(name.to_owned(), Tag::Compound(value));
     }
 
-    pub fn get_compound_tag<'a>(&self, name: &'a str) -> Result<&CompoundTag, TagError<'a>> {
+    pub fn get_compound_tag<'a>(
+        &'a self,
+        name: &'a str,
+    ) -> Result<&CompoundTag, CompoundTagError<'a>> {
         match self.tags.get(name) {
             Some(tag) => match tag {
                 Tag::Compound(value) => Ok(value),
-                _ => Err(TagError::WrongType),
+                actual_tag => Err(CompoundTagError::TagWrongType { name, actual_tag }),
             },
-            None => Err(TagError::NotFound { key: name }),
+            None => Err(CompoundTagError::TagNotFound { name }),
         }
     }
 
-    fn get_vec<'a>(&self, name: &'a str) -> Result<&Vec<Tag>, TagError<'a>> {
+    fn get_vec<'a>(&'a self, name: &'a str) -> Result<&Vec<Tag>, CompoundTagError<'a>> {
         match self.tags.get(name) {
             Some(tag) => match tag {
                 Tag::List(value) => Ok(value),
-                _ => Err(TagError::WrongType),
+                actual_tag => Err(CompoundTagError::TagWrongType { name, actual_tag }),
             },
-            None => Err(TagError::NotFound { key: name }),
+            None => Err(CompoundTagError::TagNotFound { name }),
         }
     }
 
@@ -169,14 +180,14 @@ impl CompoundTag {
         self.tags.insert(name.to_owned(), Tag::List(tags));
     }
 
-    pub fn get_str_vec<'a>(&self, name: &'a str) -> Result<Vec<&str>, TagError<'a>> {
+    pub fn get_str_vec<'a>(&'a self, name: &'a str) -> Result<Vec<&str>, CompoundTagError<'a>> {
         let tags = self.get_vec(name)?;
         let mut vec = Vec::new();
 
         for tag in tags {
             match tag {
                 Tag::String(value) => vec.push(value.as_str()),
-                _ => return Err(TagError::WrongType),
+                actual_tag => return Err(CompoundTagError::TagWrongType { name, actual_tag }),
             }
         }
 
@@ -194,16 +205,16 @@ impl CompoundTag {
     }
 
     pub fn get_compound_tag_vec<'a>(
-        &self,
+        &'a self,
         name: &'a str,
-    ) -> Result<Vec<&CompoundTag>, TagError<'a>> {
+    ) -> Result<Vec<&CompoundTag>, CompoundTagError<'a>> {
         let tags = self.get_vec(name)?;
         let mut vec = Vec::new();
 
         for tag in tags {
             match tag {
                 Tag::Compound(value) => vec.push(value),
-                _ => return Err(TagError::WrongType),
+                actual_tag => return Err(CompoundTagError::TagWrongType { name, actual_tag }),
             }
         }
 

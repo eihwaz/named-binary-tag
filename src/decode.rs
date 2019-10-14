@@ -1,78 +1,100 @@
-use crate::{CompoundTag, Tag, TagError};
+use crate::{CompoundTag, Tag};
 use byteorder::{BigEndian, ReadBytesExt};
 use linked_hash_map::LinkedHashMap;
+use std::io;
 use std::io::Read;
 
-pub fn read_compound_tag<'a, R: Read>(reader: &mut R) -> Result<CompoundTag, TagError<'a>> {
-    let tag_id = reader.read_u8().unwrap();
+/// Possible types of errors while decoding tag.
+#[derive(Debug)]
+pub enum TagDecodeError {
+    /// Root of tag must be compound tag.
+    RootMustBeCompoundTag {
+        /// Actual tag.
+        actual_tag: Tag,
+    },
+    /// Tag type not recognized.
+    UnknownTagType {
+        /// Tag type id which is not recognized.
+        tag_type_id: u8,
+    },
+    /// I/O Error which happened while were decoding.
+    IOError { io_error: io::Error },
+}
+
+impl From<io::Error> for TagDecodeError {
+    fn from(io_error: io::Error) -> Self {
+        TagDecodeError::IOError { io_error }
+    }
+}
+
+pub fn read_compound_tag<'a, R: Read>(reader: &mut R) -> Result<CompoundTag, TagDecodeError> {
+    let tag_id = reader.read_u8()?;
     let (_, tag) = read_tag(tag_id, reader, true)?;
 
     match tag {
         Tag::Compound(value) => Ok(value),
-        _ => Err(TagError::ExpectedCompoundTag {
-            unexpected_tag_id: tag.id(),
-        }),
+        actual_tag => Err(TagDecodeError::RootMustBeCompoundTag { actual_tag }),
     }
 }
 
-fn read_tag<'a, R: Read>(
+fn read_tag<R: Read>(
     id: u8,
     reader: &mut R,
     read_name: bool,
-) -> Result<(String, Tag), TagError<'a>> {
+) -> Result<(String, Tag), TagDecodeError> {
     if id == 0 {
         return Ok(("".to_owned(), Tag::End));
     }
 
     let name = if read_name {
-        read_string(reader)
+        read_string(reader)?
     } else {
         String::from("")
     };
 
     match id {
         1 => {
-            let value = reader.read_i8().unwrap();
+            let value = reader.read_i8()?;
             let tag = Tag::Byte(value);
 
             return Ok((name, tag));
         }
         2 => {
-            let value = reader.read_i16::<BigEndian>().unwrap();
+            let value = reader.read_i16::<BigEndian>()?;
             let tag = Tag::Short(value);
 
             return Ok((name, tag));
         }
         3 => {
-            let value = reader.read_i32::<BigEndian>().unwrap();
+            let value = reader.read_i32::<BigEndian>()?;
             let tag = Tag::Int(value);
 
             return Ok((name, tag));
         }
         4 => {
-            let value = reader.read_i64::<BigEndian>().unwrap();
+            let value = reader.read_i64::<BigEndian>()?;
             let tag = Tag::Long(value);
 
             return Ok((name, tag));
         }
         5 => {
-            let value = reader.read_f32::<BigEndian>().unwrap();
+            let value = reader.read_f32::<BigEndian>()?;
             let tag = Tag::Float(value);
 
             return Ok((name, tag));
         }
         6 => {
-            let value = reader.read_f64::<BigEndian>().unwrap();
+            let value = reader.read_f64::<BigEndian>()?;
             let tag = Tag::Double(value);
 
             return Ok((name, tag));
         }
         7 => {
-            let length = reader.read_u32::<BigEndian>().unwrap();
+            let length = reader.read_u32::<BigEndian>()?;
             let mut value = Vec::new();
 
             for _ in 0..length {
-                value.push(reader.read_i8().unwrap());
+                value.push(reader.read_i8()?);
             }
 
             let tag = Tag::ByteArray(value);
@@ -80,14 +102,14 @@ fn read_tag<'a, R: Read>(
             return Ok((name, tag));
         }
         8 => {
-            let value = read_string(reader);
+            let value = read_string(reader)?;
             let tag = Tag::String(value);
 
             return Ok((name, tag));
         }
         9 => {
-            let list_tags_id = reader.read_u8().unwrap();
-            let length = reader.read_u32::<BigEndian>().unwrap();
+            let list_tags_id = reader.read_u8()?;
+            let length = reader.read_u32::<BigEndian>()?;
             let mut value = Vec::new();
 
             for _ in 0..length {
@@ -103,7 +125,7 @@ fn read_tag<'a, R: Read>(
             let mut tags = LinkedHashMap::new();
 
             loop {
-                let tag_id = reader.read_u8().unwrap();
+                let tag_id = reader.read_u8()?;
                 let (name, tag) = read_tag(tag_id, reader, true)?;
 
                 match tag {
@@ -120,11 +142,11 @@ fn read_tag<'a, R: Read>(
             return Ok((name, tag));
         }
         11 => {
-            let length = reader.read_u32::<BigEndian>().unwrap();
+            let length = reader.read_u32::<BigEndian>()?;
             let mut value = Vec::new();
 
             for _ in 0..length {
-                value.push(reader.read_i32::<BigEndian>().unwrap());
+                value.push(reader.read_i32::<BigEndian>()?);
             }
 
             let tag = Tag::IntArray(value);
@@ -132,27 +154,27 @@ fn read_tag<'a, R: Read>(
             return Ok((name, tag));
         }
         12 => {
-            let length = reader.read_u32::<BigEndian>().unwrap();
+            let length = reader.read_u32::<BigEndian>()?;
             let mut value = Vec::new();
 
             for _ in 0..length {
-                value.push(reader.read_i64::<BigEndian>().unwrap());
+                value.push(reader.read_i64::<BigEndian>()?);
             }
 
             let tag = Tag::LongArray(value);
 
             return Ok((name, tag));
         }
-        type_id => return Err(TagError::UnknownType { type_id }),
+        tag_type_id => return Err(TagDecodeError::UnknownTagType { tag_type_id }),
     }
 }
 
-fn read_string<R: Read>(reader: &mut R) -> String {
-    let length = reader.read_u16::<BigEndian>().unwrap();
+fn read_string<R: Read>(reader: &mut R) -> Result<String, TagDecodeError> {
+    let length = reader.read_u16::<BigEndian>()?;
     let mut buf = vec![0; length as usize];
-    reader.read_exact(&mut buf).unwrap();
+    reader.read_exact(&mut buf)?;
 
-    String::from_utf8_lossy(&buf).into_owned()
+    Ok(String::from_utf8_lossy(&buf).into_owned())
 }
 
 #[test]
