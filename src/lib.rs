@@ -98,21 +98,21 @@ impl CompoundTag {
         }
     }
 
-    define_primitive_type!(i8, Byte, get_i8, set_i8);
-    define_primitive_type!(i16, Short, get_i16, set_i16);
-    define_primitive_type!(i32, Int, get_i32, set_i32);
-    define_primitive_type!(i64, Long, get_i64, set_i64);
-    define_primitive_type!(f32, Float, get_f32, set_f32);
-    define_primitive_type!(f64, Double, get_f64, set_f64);
-    define_array_type!(i8, ByteArray, get_i8_vec, set_i8_vec);
-    define_array_type!(i32, IntArray, get_i32_vec, set_i32_vec);
-    define_array_type!(i64, LongArray, get_i64_vec, set_i64_vec);
+    define_primitive_type!(i8, Byte, get_i8, insert_i8);
+    define_primitive_type!(i16, Short, get_i16, insert_i16);
+    define_primitive_type!(i32, Int, get_i32, insert_i32);
+    define_primitive_type!(i64, Long, get_i64, insert_i64);
+    define_primitive_type!(f32, Float, get_f32, insert_f32);
+    define_primitive_type!(f64, Double, get_f64, insert_f64);
+    define_array_type!(i8, ByteArray, get_i8_vec, insert_i8_vec);
+    define_array_type!(i32, IntArray, get_i32_vec, insert_i32_vec);
+    define_array_type!(i64, LongArray, get_i64_vec, insert_i64_vec);
 
-    pub fn set_bool(&mut self, name: &str, value: bool) {
+    pub fn insert_bool(&mut self, name: &str, value: bool) {
         if value {
-            self.set_i8(name, 1);
+            self.insert_i8(name, 1);
         } else {
-            self.set_i8(name, 0);
+            self.insert_i8(name, 0);
         }
     }
 
@@ -120,7 +120,7 @@ impl CompoundTag {
         Ok(self.get_i8(name)? == 1)
     }
 
-    pub fn set_str(&mut self, name: &str, value: &str) {
+    pub fn insert_str(&mut self, name: &str, value: &str) {
         self.tags
             .insert(name.to_owned(), Tag::String(value.to_owned()));
     }
@@ -135,7 +135,7 @@ impl CompoundTag {
         }
     }
 
-    pub fn set_compound_tag(&mut self, name: &str, value: CompoundTag) {
+    pub fn insert_compound_tag(&mut self, name: &str, value: CompoundTag) {
         self.tags.insert(name.to_owned(), Tag::Compound(value));
     }
 
@@ -159,7 +159,7 @@ impl CompoundTag {
         }
     }
 
-    pub fn set_str_vec(&mut self, name: &str, vec: Vec<&str>) {
+    pub fn insert_str_vec(&mut self, name: &str, vec: Vec<&str>) {
         let mut tags = Vec::new();
 
         for value in vec {
@@ -183,7 +183,7 @@ impl CompoundTag {
         Ok(vec)
     }
 
-    pub fn set_compound_tag_vec(&mut self, name: &str, vec: Vec<CompoundTag>) {
+    pub fn insert_compound_tag_vec(&mut self, name: &str, vec: Vec<CompoundTag>) {
         let mut tags = Vec::new();
 
         for value in vec {
@@ -214,7 +214,7 @@ impl CompoundTag {
 #[test]
 fn test_compound_tag_i8() {
     let mut compound_tag = CompoundTag::new();
-    compound_tag.set_i8("i8", 1);
+    compound_tag.insert_i8("i8", 1);
 
     assert_eq!(compound_tag.get_i8("i8").unwrap(), 1i8);
 }
@@ -222,7 +222,7 @@ fn test_compound_tag_i8() {
 #[test]
 fn test_compound_tag_bool() {
     let mut compound_tag = CompoundTag::new();
-    compound_tag.set_bool("bool", true);
+    compound_tag.insert_bool("bool", true);
 
     assert!(compound_tag.get_bool("bool").unwrap());
 }
@@ -230,7 +230,7 @@ fn test_compound_tag_bool() {
 #[test]
 fn test_compound_tag_i16() {
     let mut compound_tag = CompoundTag::new();
-    compound_tag.set_i16("i16", 2);
+    compound_tag.insert_i16("i16", 2);
 
     assert_eq!(compound_tag.get_i16("i16").unwrap(), 2i16);
 }
@@ -238,7 +238,7 @@ fn test_compound_tag_i16() {
 #[test]
 fn test_compound_tag_i32() {
     let mut compound_tag = CompoundTag::new();
-    compound_tag.set_i32("i32", 3);
+    compound_tag.insert_i32("i32", 3);
 
     assert_eq!(compound_tag.get_i32("i32").unwrap(), 3i32);
 }
@@ -246,7 +246,7 @@ fn test_compound_tag_i32() {
 #[test]
 fn test_compound_tag_i64() {
     let mut compound_tag = CompoundTag::new();
-    compound_tag.set_i64("i64", 4);
+    compound_tag.insert_i64("i64", 4);
 
     assert_eq!(compound_tag.get_i64("i64").unwrap(), 4i64);
 }
@@ -254,7 +254,7 @@ fn test_compound_tag_i64() {
 #[test]
 fn test_compound_tag_f32() {
     let mut compound_tag = CompoundTag::new();
-    compound_tag.set_f32("f32", 5.1);
+    compound_tag.insert_f32("f32", 5.1);
 
     assert_eq!(compound_tag.get_f32("f32").unwrap(), 5.1f32);
 }
@@ -262,7 +262,7 @@ fn test_compound_tag_f32() {
 #[test]
 fn test_compound_tag_f64() {
     let mut compound_tag = CompoundTag::new();
-    compound_tag.set_f64("f64", 6.3322);
+    compound_tag.insert_f64("f64", 6.3322);
 
     assert_eq!(compound_tag.get_f64("f64").unwrap(), 6.3322f64);
 }
@@ -270,7 +270,7 @@ fn test_compound_tag_f64() {
 #[test]
 fn test_compound_tag_str() {
     let mut compound_tag = CompoundTag::new();
-    compound_tag.set_str("str", "hello world");
+    compound_tag.insert_str("str", "hello world");
 
     assert_eq!(compound_tag.get_str("str").unwrap(), "hello world");
 }
@@ -278,11 +278,11 @@ fn test_compound_tag_str() {
 #[test]
 fn test_compound_tag_nested_compound_tag() {
     let mut compound_tag = CompoundTag::new();
-    let mut set_nested_compound_tag = CompoundTag::new();
-    set_nested_compound_tag.set_i8("i8", 1);
-    set_nested_compound_tag.set_str("str", "hello world");
+    let mut insert_nested_compound_tag = CompoundTag::new();
+    insert_nested_compound_tag.insert_i8("i8", 1);
+    insert_nested_compound_tag.insert_str("str", "hello world");
 
-    compound_tag.set_compound_tag("nested_compound_tag", set_nested_compound_tag);
+    compound_tag.insert_compound_tag("nested_compound_tag", insert_nested_compound_tag);
 
     let get_nested_compound_tag = compound_tag
         .get_compound_tag("nested_compound_tag")
@@ -298,7 +298,7 @@ fn test_compound_tag_nested_compound_tag() {
 #[test]
 fn test_compound_tag_i8_vec() {
     let mut compound_tag = CompoundTag::new();
-    compound_tag.set_i8_vec("i8_vec", vec![0, 1]);
+    compound_tag.insert_i8_vec("i8_vec", vec![0, 1]);
 
     let i8_vec = compound_tag.get_i8_vec("i8_vec").unwrap();
     assert_eq!(i8_vec[0], 0);
@@ -308,7 +308,7 @@ fn test_compound_tag_i8_vec() {
 #[test]
 fn test_compound_tag_i32_vec() {
     let mut compound_tag = CompoundTag::new();
-    compound_tag.set_i32_vec("i32_vec", vec![7, 8, 9]);
+    compound_tag.insert_i32_vec("i32_vec", vec![7, 8, 9]);
 
     let i32_vec = compound_tag.get_i32_vec("i32_vec").unwrap();
 
@@ -320,7 +320,7 @@ fn test_compound_tag_i32_vec() {
 #[test]
 fn test_compound_tag_i64_vec() {
     let mut compound_tag = CompoundTag::new();
-    compound_tag.set_i64_vec("i64_vec", vec![10, 11, 12]);
+    compound_tag.insert_i64_vec("i64_vec", vec![10, 11, 12]);
     let i64_vec = compound_tag.get_i64_vec("i64_vec").unwrap();
 
     assert_eq!(i64_vec[0], 10i64);
@@ -331,9 +331,9 @@ fn test_compound_tag_i64_vec() {
 #[test]
 fn test_compound_tag_str_vec() {
     let mut compound_tag = CompoundTag::new();
-    let set_str_vec = vec!["a", "b", "c"];
+    let insert_str_vec = vec!["a", "b", "c"];
 
-    compound_tag.set_str_vec("str_vec", set_str_vec);
+    compound_tag.insert_str_vec("str_vec", insert_str_vec);
 
     let get_str_vec = compound_tag.get_str_vec("str_vec").unwrap();
     assert_eq!(get_str_vec[0], "a");
@@ -344,15 +344,16 @@ fn test_compound_tag_str_vec() {
 #[test]
 fn test_compound_tag_nested_compound_tag_vec() {
     let mut compound_tag = CompoundTag::new();
-    let mut set_nested_compound_tag_1 = CompoundTag::new();
-    let mut set_nested_compound_tag_2 = CompoundTag::new();
+    let mut insert_nested_compound_tag_1 = CompoundTag::new();
+    let mut insert_nested_compound_tag_2 = CompoundTag::new();
 
-    set_nested_compound_tag_1.set_str("str", "test");
-    set_nested_compound_tag_2.set_i32("i32", 222333111);
+    insert_nested_compound_tag_1.insert_str("str", "test");
+    insert_nested_compound_tag_2.insert_i32("i32", 222333111);
 
-    let set_nested_compound_tag_vec = vec![set_nested_compound_tag_1, set_nested_compound_tag_2];
+    let insert_nested_compound_tag_vec =
+        vec![insert_nested_compound_tag_1, insert_nested_compound_tag_2];
 
-    compound_tag.set_compound_tag_vec("nested_compound_tag_vec", set_nested_compound_tag_vec);
+    compound_tag.insert_compound_tag_vec("nested_compound_tag_vec", insert_nested_compound_tag_vec);
 
     let get_nested_compound_tag_vec = compound_tag
         .get_compound_tag_vec("nested_compound_tag_vec")
