@@ -6,7 +6,6 @@ pub mod encode;
 /// Possible types of tags and they payload.
 #[derive(Debug)]
 pub enum Tag {
-    End,
     Byte(i8),
     Short(i16),
     Int(i32),
@@ -24,7 +23,6 @@ pub enum Tag {
 impl Tag {
     fn id(&self) -> u8 {
         match self {
-            Tag::End => 0,
             Tag::Byte(_) => 1,
             Tag::Short(_) => 2,
             Tag::Int(_) => 3,

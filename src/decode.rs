@@ -29,7 +29,8 @@ impl From<io::Error> for TagDecodeError {
 
 pub fn read_compound_tag<'a, R: Read>(reader: &mut R) -> Result<CompoundTag, TagDecodeError> {
     let tag_id = reader.read_u8()?;
-    let (_, tag) = read_tag(tag_id, reader, true)?;
+    let _name = read_string(reader)?;
+    let tag = read_tag(tag_id, reader)?;
 
     match tag {
         Tag::Compound(value) => Ok(value),
@@ -37,57 +38,37 @@ pub fn read_compound_tag<'a, R: Read>(reader: &mut R) -> Result<CompoundTag, Tag
     }
 }
 
-fn read_tag<R: Read>(
-    id: u8,
-    reader: &mut R,
-    read_name: bool,
-) -> Result<(String, Tag), TagDecodeError> {
-    if id == 0 {
-        return Ok(("".to_owned(), Tag::End));
-    }
-
-    let name = if read_name {
-        read_string(reader)?
-    } else {
-        String::from("")
-    };
-
-    match id {
+fn read_tag<R: Read>(tag_id: u8, reader: &mut R) -> Result<Tag, TagDecodeError> {
+    match tag_id {
         1 => {
             let value = reader.read_i8()?;
-            let tag = Tag::Byte(value);
 
-            return Ok((name, tag));
+            return Ok(Tag::Byte(value));
         }
         2 => {
             let value = reader.read_i16::<BigEndian>()?;
-            let tag = Tag::Short(value);
 
-            return Ok((name, tag));
+            return Ok(Tag::Short(value));
         }
         3 => {
             let value = reader.read_i32::<BigEndian>()?;
-            let tag = Tag::Int(value);
 
-            return Ok((name, tag));
+            return Ok(Tag::Int(value));
         }
         4 => {
             let value = reader.read_i64::<BigEndian>()?;
-            let tag = Tag::Long(value);
 
-            return Ok((name, tag));
+            return Ok(Tag::Long(value));
         }
         5 => {
             let value = reader.read_f32::<BigEndian>()?;
-            let tag = Tag::Float(value);
 
-            return Ok((name, tag));
+            return Ok(Tag::Float(value));
         }
         6 => {
             let value = reader.read_f64::<BigEndian>()?;
-            let tag = Tag::Double(value);
 
-            return Ok((name, tag));
+            return Ok(Tag::Double(value));
         }
         7 => {
             let length = reader.read_u32::<BigEndian>()?;
@@ -97,15 +78,12 @@ fn read_tag<R: Read>(
                 value.push(reader.read_i8()?);
             }
 
-            let tag = Tag::ByteArray(value);
-
-            return Ok((name, tag));
+            return Ok(Tag::ByteArray(value));
         }
         8 => {
             let value = read_string(reader)?;
-            let tag = Tag::String(value);
 
-            return Ok((name, tag));
+            return Ok(Tag::String(value));
         }
         9 => {
             let list_tags_id = reader.read_u8()?;
@@ -113,33 +91,31 @@ fn read_tag<R: Read>(
             let mut value = Vec::new();
 
             for _ in 0..length {
-                let (_, tag) = read_tag(list_tags_id, reader, false)?;
-                value.push(tag);
+                value.push(read_tag(list_tags_id, reader)?);
             }
 
-            let tag = Tag::List(value);
-
-            return Ok((name, tag));
+            return Ok(Tag::List(value));
         }
         10 => {
             let mut tags = LinkedHashMap::new();
 
             loop {
                 let tag_id = reader.read_u8()?;
-                let (name, tag) = read_tag(tag_id, reader, true)?;
 
-                match tag {
-                    Tag::End => break,
-                    _ => {
-                        tags.insert(name, tag);
-                    }
+                // Compound tag end reached.
+                if tag_id == 0 {
+                    break;
                 }
+
+                let name = read_string(reader)?;
+                let tag = read_tag(tag_id, reader)?;
+
+                tags.insert(name, tag);
             }
 
             let compound_tag = CompoundTag { tags };
-            let tag = Tag::Compound(compound_tag);
 
-            return Ok((name, tag));
+            return Ok(Tag::Compound(compound_tag));
         }
         11 => {
             let length = reader.read_u32::<BigEndian>()?;
@@ -149,9 +125,7 @@ fn read_tag<R: Read>(
                 value.push(reader.read_i32::<BigEndian>()?);
             }
 
-            let tag = Tag::IntArray(value);
-
-            return Ok((name, tag));
+            return Ok(Tag::IntArray(value));
         }
         12 => {
             let length = reader.read_u32::<BigEndian>()?;
@@ -161,9 +135,7 @@ fn read_tag<R: Read>(
                 value.push(reader.read_i64::<BigEndian>()?);
             }
 
-            let tag = Tag::LongArray(value);
-
-            return Ok((name, tag));
+            return Ok(Tag::LongArray(value));
         }
         tag_type_id => return Err(TagDecodeError::UnknownTagType { tag_type_id }),
     }

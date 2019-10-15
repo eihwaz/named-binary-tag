@@ -15,7 +15,6 @@ pub fn write_compound_tag<W: Write>(
 
 fn write_tag<W: Write>(writer: &mut W, tag: Tag) -> Result<(), Error> {
     match tag {
-        Tag::End => {}
         Tag::Byte(value) => writer.write_i8(value)?,
         Tag::Short(value) => writer.write_i16::<BigEndian>(value)?,
         Tag::Int(value) => writer.write_i32::<BigEndian>(value)?,
@@ -32,9 +31,10 @@ fn write_tag<W: Write>(writer: &mut W, tag: Tag) -> Result<(), Error> {
         Tag::String(value) => write_string(writer, value)?,
         Tag::List(value) => {
             if value.len() > 0 {
-                writer.write_u8(value[0].id())?
+                writer.write_u8(value[0].id())?;
             } else {
-                writer.write_u8(Tag::End.id())?
+                // Empty list type.
+                writer.write_u8(0)?;
             }
 
             writer.write_u32::<BigEndian>(value.len() as u32)?;
@@ -50,7 +50,8 @@ fn write_tag<W: Write>(writer: &mut W, tag: Tag) -> Result<(), Error> {
                 write_tag(writer, tag)?;
             }
 
-            writer.write_u8(Tag::End.id())?;
+            // To mark compound tag end.
+            writer.write_u8(0)?;
         }
         Tag::IntArray(value) => {
             writer.write_u32::<BigEndian>(value.len() as u32)?;
