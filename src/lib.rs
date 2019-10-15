@@ -89,7 +89,7 @@ macro_rules! define_array_type (
             match self.tags.get(name) {
                 Some(tag) => match tag {
                     Tag::$tag(value) => Ok(value),
-                 actual_tag => Err(CompoundTagError::TagWrongType { name, actual_tag }),
+                    actual_tag => Err(CompoundTagError::TagWrongType { name, actual_tag }),
                 },
                 None => Err(CompoundTagError::TagNotFound { name }),
             }
