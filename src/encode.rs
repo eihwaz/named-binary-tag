@@ -5,32 +5,37 @@ use std::io::{Error, Write};
 
 pub fn write_gzip_compound_tag<W: Write>(
     writer: &mut W,
+    name: &str,
     compound_tag: CompoundTag,
 ) -> Result<(), Error> {
     write_compound_tag(
         &mut GzEncoder::new(writer, Default::default()),
+        name,
         compound_tag,
     )
 }
 
 pub fn write_zlib_compound_tag<W: Write>(
     writer: &mut W,
+    name: &str,
     compound_tag: CompoundTag,
 ) -> Result<(), Error> {
     write_compound_tag(
         &mut ZlibEncoder::new(writer, Default::default()),
+        name,
         compound_tag,
     )
 }
 
 pub fn write_compound_tag<W: Write>(
     writer: &mut W,
+    name: &str,
     compound_tag: CompoundTag,
 ) -> Result<(), Error> {
     let tag = Tag::Compound(compound_tag);
 
     writer.write_u8(tag.id())?;
-    write_string(writer, String::from(""))?;
+    write_string(writer, name.to_owned())?;
     write_tag(writer, tag)
 }
 
@@ -101,6 +106,17 @@ fn write_string<W: Write>(writer: &mut W, value: String) -> Result<(), Error> {
 }
 
 #[test]
+fn test_hello_world_write() {
+    let mut hello_world = CompoundTag::new();
+    hello_world.insert_str("name", "Bananrama");
+
+    let mut vec = Vec::new();
+    write_compound_tag(&mut vec, "hello world", hello_world).unwrap();
+
+    assert_eq!(vec, include_bytes!("../test/hello_world.dat").to_vec());
+}
+
+#[test]
 fn test_servers_write() {
     let mut server = CompoundTag::new();
 
@@ -115,7 +131,7 @@ fn test_servers_write() {
     root_tag.insert_compound_tag_vec("servers", servers);
 
     let mut vec = Vec::new();
-    write_compound_tag(&mut vec, root_tag).unwrap();
+    write_compound_tag(&mut vec, "", root_tag).unwrap();
 
     assert_eq!(vec, include_bytes!("../test/servers.dat").to_vec());
 }

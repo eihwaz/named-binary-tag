@@ -28,21 +28,27 @@ impl From<io::Error> for TagDecodeError {
     }
 }
 
-pub fn read_gzip_compound_tag<R: Read>(reader: &mut R) -> Result<CompoundTag, TagDecodeError> {
+pub fn read_gzip_compound_tag<R: Read>(
+    reader: &mut R,
+) -> Result<(String, CompoundTag), TagDecodeError> {
     read_compound_tag(&mut GzDecoder::new(reader))
 }
 
-pub fn read_zlib_compound_tag<R: Read>(reader: &mut R) -> Result<CompoundTag, TagDecodeError> {
+pub fn read_zlib_compound_tag<R: Read>(
+    reader: &mut R,
+) -> Result<(String, CompoundTag), TagDecodeError> {
     read_compound_tag(&mut ZlibDecoder::new(reader))
 }
 
-pub fn read_compound_tag<'a, R: Read>(reader: &mut R) -> Result<CompoundTag, TagDecodeError> {
+pub fn read_compound_tag<'a, R: Read>(
+    reader: &mut R,
+) -> Result<(String, CompoundTag), TagDecodeError> {
     let tag_id = reader.read_u8()?;
-    let _name = read_string(reader)?;
+    let name = read_string(reader)?;
     let tag = read_tag(tag_id, reader)?;
 
     match tag {
-        Tag::Compound(value) => Ok(value),
+        Tag::Compound(value) => Ok((name, value)),
         actual_tag => Err(TagDecodeError::RootMustBeCompoundTag { actual_tag }),
     }
 }
@@ -163,8 +169,9 @@ fn test_servers_read() {
     use std::io::Cursor;
 
     let mut cursor = Cursor::new(include_bytes!("../test/servers.dat").to_vec());
-    let root_tag = read_compound_tag(&mut cursor).unwrap();
+    let (name, root_tag) = read_compound_tag(&mut cursor).unwrap();
 
+    assert!(name.is_empty());
     let servers = root_tag.get_compound_tag_vec("servers").unwrap();
     assert_eq!(servers.len(), 1);
 
@@ -183,8 +190,9 @@ fn test_big_test_read() {
     use std::io::Cursor;
 
     let mut cursor = Cursor::new(include_bytes!("../test/bigtest.dat").to_vec());
-    let root_tag = read_gzip_compound_tag(&mut cursor).unwrap();
+    let (name, root_tag) = read_gzip_compound_tag(&mut cursor).unwrap();
 
+    assert_eq!(name, "Level");
     assert_eq!(root_tag.get_i8("byteTest").unwrap(), i8::max_value());
     assert_eq!(root_tag.get_i16("shortTest").unwrap(), i16::max_value());
     assert_eq!(root_tag.get_i32("intTest").unwrap(), i32::max_value());
