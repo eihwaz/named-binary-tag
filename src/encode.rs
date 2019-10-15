@@ -6,20 +6,14 @@ pub fn write_compound_tag<W: Write>(
     writer: &mut W,
     compound_tag: CompoundTag,
 ) -> Result<(), Error> {
-    write_tag(writer, String::from(""), Tag::Compound(compound_tag), true)
+    let tag = Tag::Compound(compound_tag);
+
+    writer.write_u8(tag.id())?;
+    write_string(writer, String::from(""))?;
+    write_tag(writer, tag)
 }
 
-fn write_tag<W: Write>(
-    writer: &mut W,
-    name: String,
-    tag: Tag,
-    write_header: bool,
-) -> Result<(), Error> {
-    if write_header {
-        writer.write_u8(tag.id())?;
-        write_string(writer, name)?;
-    }
-
+fn write_tag<W: Write>(writer: &mut W, tag: Tag) -> Result<(), Error> {
     match tag {
         Tag::End => {}
         Tag::Byte(value) => writer.write_i8(value)?,
@@ -46,12 +40,14 @@ fn write_tag<W: Write>(
             writer.write_u32::<BigEndian>(value.len() as u32)?;
 
             for tag in value {
-                write_tag(writer, String::from(""), tag, false)?;
+                write_tag(writer, tag)?;
             }
         }
         Tag::Compound(value) => {
             for (name, tag) in value.tags {
-                write_tag(writer, name, tag, true)?;
+                writer.write_u8(tag.id())?;
+                write_string(writer, name)?;
+                write_tag(writer, tag)?;
             }
 
             writer.write_u8(Tag::End.id())?;
