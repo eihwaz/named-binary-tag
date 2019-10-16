@@ -165,6 +165,17 @@ fn read_string<R: Read>(reader: &mut R) -> Result<String, TagDecodeError> {
 }
 
 #[test]
+fn test_hello_world_read() {
+    use std::io::Cursor;
+
+    let mut cursor = Cursor::new(include_bytes!("../test/hello_world.dat").to_vec());
+    let (name, hello_world) = read_compound_tag(&mut cursor).unwrap();
+
+    assert_eq!(name, "hello world");
+    assert_eq!(hello_world.get_str("name").unwrap(), "Bananrama");
+}
+
+#[test]
 fn test_servers_read() {
     use std::io::Cursor;
 
