@@ -1,10 +1,11 @@
 use linked_hash_map::LinkedHashMap;
+use std::fmt::{Display, Error, Formatter};
 
 pub mod decode;
 pub mod encode;
 
 /// Possible types of tags and they payload.
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub enum Tag {
     Byte(i8),
     Short(i16),
@@ -21,7 +22,7 @@ pub enum Tag {
 }
 
 impl Tag {
-    fn id(&self) -> u8 {
+    fn type_id(&self) -> u8 {
         match self {
             Tag::Byte(_) => 1,
             Tag::Short(_) => 2,
@@ -37,10 +38,28 @@ impl Tag {
             Tag::LongArray(_) => 12,
         }
     }
+
+    fn type_name(&self) -> &str {
+        match self {
+            Tag::Byte(_) => "TAG_Byte",
+            Tag::Short(_) => "TAG_Short",
+            Tag::Int(_) => "TAG_Int",
+            Tag::Long(_) => "TAG_Long",
+            Tag::Float(_) => "TAG_Float",
+            Tag::Double(_) => "TAG_Double",
+            Tag::ByteArray(_) => "TAG_Byte_Array",
+            Tag::String(_) => "TAG_String",
+            Tag::List(_) => "TAG_List",
+            Tag::Compound(_) => "TAG_Compound",
+            Tag::IntArray(_) => "TAG_Int_Array",
+            Tag::LongArray(_) => "TAG_Long_Array",
+        }
+    }
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct CompoundTag {
+    pub name: String,
     tags: LinkedHashMap<String, Tag>,
 }
 
@@ -98,8 +117,9 @@ macro_rules! define_array_type (
 );
 
 impl CompoundTag {
-    pub fn new() -> Self {
+    pub fn new(name: &str) -> Self {
         CompoundTag {
+            name: name.to_owned(),
             tags: LinkedHashMap::new(),
         }
     }
@@ -220,9 +240,72 @@ impl CompoundTag {
     }
 }
 
+impl Display for CompoundTag {
+    fn fmt(&self, f: &mut Formatter<'_>) -> Result<(), Error> {
+        fmt_tag(f, self.name.as_str(), &Tag::Compound(self.clone()), 0)
+    }
+}
+
+fn fmt_tag(f: &mut Formatter<'_>, name: &str, tag: &Tag, indent: usize) -> Result<(), Error> {
+    write!(f, "{:indent$}", "", indent = indent)?;
+    let type_name = tag.type_name();
+
+    match tag {
+        Tag::Byte(value) => writeln!(f, "{}('{}'): '{}'", type_name, name, value)?,
+        Tag::Short(value) => writeln!(f, "{}('{}'): '{}'", type_name, name, value)?,
+        Tag::Int(value) => writeln!(f, "{}('{}'): '{}'", type_name, name, value)?,
+        Tag::Long(value) => writeln!(f, "{}('{}'): '{}'", type_name, name, value)?,
+        Tag::Float(value) => writeln!(f, "{}('{}'): '{}'", type_name, name, value)?,
+        Tag::Double(value) => writeln!(f, "{}('{}'): '{}'", type_name, name, value)?,
+        Tag::ByteArray(value) => writeln!(f, "{}('{}'): '{:?}'", type_name, name, value)?,
+        Tag::String(value) => writeln!(f, "{}('{}'): '{}'", type_name, name, value)?,
+        Tag::List(value) => {
+            let length = value.len();
+
+            match length {
+                0 => writeln!(f, "{}('{}'): 0 entries", type_name, name)?,
+                1 => writeln!(f, "{}('{}'): 1 entry {{", type_name, name)?,
+                _ => writeln!(f, "{}('{}'): {} entries {{", type_name, name, length)?,
+            }
+
+            for tag in value {
+                fmt_tag(f, "", tag, indent + 2)?;
+            }
+
+            if length > 0 {
+                write!(f, "{:indent$}", "", indent = indent)?;
+                writeln!(f, "}}")?;
+            }
+        }
+        Tag::Compound(value) => {
+            let name = &value.name;
+            let length = value.tags.len();
+
+            match length {
+                0 => writeln!(f, "{}('{}'): 0 entries", type_name, name)?,
+                1 => writeln!(f, "{}('{}'): 1 entry {{", type_name, name)?,
+                _ => writeln!(f, "{}('{}'): {} entries {{", type_name, name, length)?,
+            }
+
+            for (name, tag) in &value.tags {
+                fmt_tag(f, name, tag, indent + 2)?;
+            }
+
+            if length > 0 {
+                write!(f, "{:indent$}", "", indent = indent)?;
+                writeln!(f, "}}")?;
+            }
+        }
+        Tag::IntArray(value) => writeln!(f, "{}('{}'): '{:?}'", type_name, name, value)?,
+        Tag::LongArray(value) => writeln!(f, "{}('{}'): '{:?}'", type_name, name, value)?,
+    };
+
+    Ok(())
+}
+
 #[test]
 fn test_compound_tag_i8() {
-    let mut compound_tag = CompoundTag::new();
+    let mut compound_tag = CompoundTag::new("");
     compound_tag.insert_i8("i8", 1);
 
     assert_eq!(compound_tag.get_i8("i8").unwrap(), 1i8);
@@ -230,7 +313,7 @@ fn test_compound_tag_i8() {
 
 #[test]
 fn test_compound_tag_bool() {
-    let mut compound_tag = CompoundTag::new();
+    let mut compound_tag = CompoundTag::new("");
     compound_tag.insert_bool("bool", true);
 
     assert!(compound_tag.get_bool("bool").unwrap());
@@ -238,7 +321,7 @@ fn test_compound_tag_bool() {
 
 #[test]
 fn test_compound_tag_i16() {
-    let mut compound_tag = CompoundTag::new();
+    let mut compound_tag = CompoundTag::new("");
     compound_tag.insert_i16("i16", 2);
 
     assert_eq!(compound_tag.get_i16("i16").unwrap(), 2i16);
@@ -246,7 +329,7 @@ fn test_compound_tag_i16() {
 
 #[test]
 fn test_compound_tag_i32() {
-    let mut compound_tag = CompoundTag::new();
+    let mut compound_tag = CompoundTag::new("");
     compound_tag.insert_i32("i32", 3);
 
     assert_eq!(compound_tag.get_i32("i32").unwrap(), 3i32);
@@ -254,7 +337,7 @@ fn test_compound_tag_i32() {
 
 #[test]
 fn test_compound_tag_i64() {
-    let mut compound_tag = CompoundTag::new();
+    let mut compound_tag = CompoundTag::new("");
     compound_tag.insert_i64("i64", 4);
 
     assert_eq!(compound_tag.get_i64("i64").unwrap(), 4i64);
@@ -262,7 +345,7 @@ fn test_compound_tag_i64() {
 
 #[test]
 fn test_compound_tag_f32() {
-    let mut compound_tag = CompoundTag::new();
+    let mut compound_tag = CompoundTag::new("");
     compound_tag.insert_f32("f32", 5.1);
 
     assert_eq!(compound_tag.get_f32("f32").unwrap(), 5.1f32);
@@ -270,7 +353,7 @@ fn test_compound_tag_f32() {
 
 #[test]
 fn test_compound_tag_f64() {
-    let mut compound_tag = CompoundTag::new();
+    let mut compound_tag = CompoundTag::new("");
     compound_tag.insert_f64("f64", 6.3322);
 
     assert_eq!(compound_tag.get_f64("f64").unwrap(), 6.3322f64);
@@ -278,7 +361,7 @@ fn test_compound_tag_f64() {
 
 #[test]
 fn test_compound_tag_str() {
-    let mut compound_tag = CompoundTag::new();
+    let mut compound_tag = CompoundTag::new("");
     compound_tag.insert_str("str", "hello world");
 
     assert_eq!(compound_tag.get_str("str").unwrap(), "hello world");
@@ -286,8 +369,8 @@ fn test_compound_tag_str() {
 
 #[test]
 fn test_compound_tag_nested_compound_tag() {
-    let mut compound_tag = CompoundTag::new();
-    let mut insert_nested_compound_tag = CompoundTag::new();
+    let mut compound_tag = CompoundTag::new("");
+    let mut insert_nested_compound_tag = CompoundTag::new("nested");
     insert_nested_compound_tag.insert_i8("i8", 1);
     insert_nested_compound_tag.insert_str("str", "hello world");
 
@@ -306,7 +389,7 @@ fn test_compound_tag_nested_compound_tag() {
 
 #[test]
 fn test_compound_tag_i8_vec() {
-    let mut compound_tag = CompoundTag::new();
+    let mut compound_tag = CompoundTag::new("");
     compound_tag.insert_i8_vec("i8_vec", vec![0, 1]);
 
     let i8_vec = compound_tag.get_i8_vec("i8_vec").unwrap();
@@ -316,7 +399,7 @@ fn test_compound_tag_i8_vec() {
 
 #[test]
 fn test_compound_tag_i32_vec() {
-    let mut compound_tag = CompoundTag::new();
+    let mut compound_tag = CompoundTag::new("");
     compound_tag.insert_i32_vec("i32_vec", vec![7, 8, 9]);
 
     let i32_vec = compound_tag.get_i32_vec("i32_vec").unwrap();
@@ -328,7 +411,7 @@ fn test_compound_tag_i32_vec() {
 
 #[test]
 fn test_compound_tag_i64_vec() {
-    let mut compound_tag = CompoundTag::new();
+    let mut compound_tag = CompoundTag::new("");
     compound_tag.insert_i64_vec("i64_vec", vec![10, 11, 12]);
     let i64_vec = compound_tag.get_i64_vec("i64_vec").unwrap();
 
@@ -339,7 +422,7 @@ fn test_compound_tag_i64_vec() {
 
 #[test]
 fn test_compound_tag_str_vec() {
-    let mut compound_tag = CompoundTag::new();
+    let mut compound_tag = CompoundTag::new("");
     let insert_str_vec = vec!["a", "b", "c"];
 
     compound_tag.insert_str_vec("str_vec", insert_str_vec);
@@ -352,9 +435,9 @@ fn test_compound_tag_str_vec() {
 
 #[test]
 fn test_compound_tag_nested_compound_tag_vec() {
-    let mut compound_tag = CompoundTag::new();
-    let mut insert_nested_compound_tag_1 = CompoundTag::new();
-    let mut insert_nested_compound_tag_2 = CompoundTag::new();
+    let mut compound_tag = CompoundTag::new("");
+    let mut insert_nested_compound_tag_1 = CompoundTag::new("");
+    let mut insert_nested_compound_tag_2 = CompoundTag::new("");
 
     insert_nested_compound_tag_1.insert_str("str", "test");
     insert_nested_compound_tag_2.insert_i32("i32", 222333111);
@@ -373,4 +456,31 @@ fn test_compound_tag_nested_compound_tag_vec() {
 
     assert_eq!(get_nested_compound_tag_1.get_str("str").unwrap(), "test");
     assert_eq!(get_nested_compound_tag_2.get_i32("i32").unwrap(), 222333111);
+}
+
+#[test]
+fn test_servers_display() {
+    let mut server = CompoundTag::new("");
+
+    server.insert_str("ip", "localhost:25565");
+    server.insert_str("name", "Minecraft Server");
+    server.insert_bool("hideAddress", true);
+
+    let mut servers = Vec::new();
+    servers.push(server);
+
+    let mut root_tag = CompoundTag::new("");
+    root_tag.insert_compound_tag_vec("servers", servers);
+
+    let expected = "TAG_Compound(''): 1 entry {
+  TAG_List('servers'): 1 entry {
+    TAG_Compound(''): 3 entries {
+      TAG_String('ip'): 'localhost:25565'
+      TAG_String('name'): 'Minecraft Server'
+      TAG_Byte('hideAddress'): '1'
+    }
+  }
+}";
+
+    assert_eq!(root_tag.to_string().trim(), expected);
 }
