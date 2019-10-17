@@ -1,10 +1,11 @@
 use linked_hash_map::LinkedHashMap;
+use std::fmt::{Debug, Display, Error, Formatter};
 
 pub mod decode;
 pub mod encode;
 
 /// Possible types of tags and they payload.
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub enum Tag {
     Byte(i8),
     Short(i16),
@@ -21,7 +22,7 @@ pub enum Tag {
 }
 
 impl Tag {
-    fn id(&self) -> u8 {
+    fn type_id(&self) -> u8 {
         match self {
             Tag::Byte(_) => 1,
             Tag::Short(_) => 2,
@@ -37,10 +38,28 @@ impl Tag {
             Tag::LongArray(_) => 12,
         }
     }
+
+    fn type_name(&self) -> &str {
+        match self {
+            Tag::Byte(_) => "TAG_Byte",
+            Tag::Short(_) => "TAG_Short",
+            Tag::Int(_) => "TAG_Int",
+            Tag::Long(_) => "TAG_Long",
+            Tag::Float(_) => "TAG_Float",
+            Tag::Double(_) => "TAG_Double",
+            Tag::ByteArray(_) => "TAG_Byte_Array",
+            Tag::String(_) => "TAG_String",
+            Tag::List(_) => "TAG_List",
+            Tag::Compound(_) => "TAG_Compound",
+            Tag::IntArray(_) => "TAG_Int_Array",
+            Tag::LongArray(_) => "TAG_Long_Array",
+        }
+    }
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct CompoundTag {
+    pub name: Option<String>,
     tags: LinkedHashMap<String, Tag>,
 }
 
@@ -100,6 +119,14 @@ macro_rules! define_array_type (
 impl CompoundTag {
     pub fn new() -> Self {
         CompoundTag {
+            name: None,
+            tags: LinkedHashMap::new(),
+        }
+    }
+
+    pub fn named(name: &str) -> Self {
+        CompoundTag {
+            name: Some(name.to_owned()),
             tags: LinkedHashMap::new(),
         }
     }
@@ -220,6 +247,110 @@ impl CompoundTag {
     }
 }
 
+impl Display for CompoundTag {
+    fn fmt(&self, f: &mut Formatter<'_>) -> Result<(), Error> {
+        let name_ref = self.name.as_ref().map(|x| &**x);
+        fmt_tag(f, name_ref, &Tag::Compound(self.clone()), 0)
+    }
+}
+
+fn fmt_tag(f: &mut Formatter, name: Option<&str>, tag: &Tag, indent: usize) -> Result<(), Error> {
+    fmt_indent(f, indent)?;
+
+    let type_name = tag.type_name();
+
+    match tag {
+        Tag::Byte(value) => fmt_simple_tag(f, type_name, name, value)?,
+        Tag::Short(value) => fmt_simple_tag(f, type_name, name, value)?,
+        Tag::Int(value) => fmt_simple_tag(f, type_name, name, value)?,
+        Tag::Long(value) => fmt_simple_tag(f, type_name, name, value)?,
+        Tag::Float(value) => fmt_simple_tag(f, type_name, name, value)?,
+        Tag::Double(value) => fmt_simple_tag(f, type_name, name, value)?,
+        Tag::ByteArray(value) => fmt_array_tag(f, type_name, name, value)?,
+        Tag::String(value) => fmt_simple_tag(f, type_name, name, value)?,
+        Tag::List(value) => {
+            let length = value.len();
+
+            fmt_list_start(f, type_name, name, length)?;
+
+            for tag in value {
+                fmt_tag(f, None, tag, indent + 2)?;
+            }
+
+            if length > 0 {
+                fmt_list_end(f, indent)?;
+            }
+        }
+        Tag::Compound(value) => {
+            let name_ref = name.as_ref().map(|x| &**x);
+            let length = value.tags.len();
+
+            fmt_list_start(f, type_name, name_ref, length)?;
+
+            for (name, tag) in &value.tags {
+                fmt_tag(f, Some(name.as_str()), tag, indent + 2)?;
+            }
+
+            if length > 0 {
+                fmt_list_end(f, indent)?;
+            }
+        }
+        Tag::IntArray(value) => fmt_array_tag(f, type_name, name, value)?,
+        Tag::LongArray(value) => fmt_array_tag(f, type_name, name, value)?,
+    };
+
+    Ok(())
+}
+
+fn fmt_simple_tag<V: Display>(
+    f: &mut Formatter,
+    type_name: &str,
+    name: Option<&str>,
+    value: V,
+) -> Result<(), Error> {
+    writeln!(f, "{}('{}'): '{}'", type_name, fmt_str_opt(name), value)
+}
+
+fn fmt_array_tag<V: Debug>(
+    f: &mut Formatter,
+    type_name: &str,
+    name: Option<&str>,
+    value: V,
+) -> Result<(), Error> {
+    writeln!(f, "{}('{}'): '{:?}'", type_name, fmt_str_opt(name), value)
+}
+
+fn fmt_list_start(
+    f: &mut Formatter,
+    type_name: &str,
+    name: Option<&str>,
+    length: usize,
+) -> Result<(), Error> {
+    let fmt_name = fmt_str_opt(name);
+
+    match length {
+        0 => writeln!(f, "{}('{}'): 0 entries", type_name, fmt_name),
+        1 => writeln!(f, "{}('{}'): 1 entry {{", type_name, fmt_name),
+        _ => writeln!(f, "{}('{}'): {} entries {{", type_name, fmt_name, length),
+    }
+}
+
+fn fmt_list_end(f: &mut Formatter, indent: usize) -> Result<(), Error> {
+    fmt_indent(f, indent)?;
+    writeln!(f, "}}")
+}
+
+fn fmt_indent(f: &mut Formatter, indent: usize) -> Result<(), Error> {
+    write!(f, "{:indent$}", "", indent = indent)
+}
+
+fn fmt_str_opt(name: Option<&str>) -> &str {
+    match name {
+        Some(value) => value,
+        None => "",
+    }
+}
+
 #[test]
 fn test_compound_tag_i8() {
     let mut compound_tag = CompoundTag::new();
@@ -287,7 +418,7 @@ fn test_compound_tag_str() {
 #[test]
 fn test_compound_tag_nested_compound_tag() {
     let mut compound_tag = CompoundTag::new();
-    let mut insert_nested_compound_tag = CompoundTag::new();
+    let mut insert_nested_compound_tag = CompoundTag::named("nested");
     insert_nested_compound_tag.insert_i8("i8", 1);
     insert_nested_compound_tag.insert_str("str", "hello world");
 
@@ -373,4 +504,57 @@ fn test_compound_tag_nested_compound_tag_vec() {
 
     assert_eq!(get_nested_compound_tag_1.get_str("str").unwrap(), "test");
     assert_eq!(get_nested_compound_tag_2.get_i32("i32").unwrap(), 222333111);
+}
+
+#[test]
+fn test_servers_display() {
+    use crate::decode::read_compound_tag;
+    use std::io::Cursor;
+
+    let mut cursor = Cursor::new(include_bytes!("../test/binary/servers.dat").to_vec());
+    let root_tag = read_compound_tag(&mut cursor).unwrap();
+
+    assert_eq!(
+        root_tag.to_string(),
+        include_str!("../test/text/servers.txt")
+    );
+}
+
+#[test]
+fn test_hello_world_display() {
+    use crate::decode::read_compound_tag;
+    use std::io::Cursor;
+
+    let mut cursor = Cursor::new(include_bytes!("../test/binary/hello_world.dat").to_vec());
+    let root_tag = read_compound_tag(&mut cursor).unwrap();
+
+    assert_eq!(
+        root_tag.to_string(),
+        include_str!("../test/text/hello_world.txt")
+    );
+}
+
+#[test]
+fn test_player_display() {
+    use crate::decode::read_gzip_compound_tag;
+    use std::io::Cursor;
+
+    let mut cursor = Cursor::new(include_bytes!("../test/binary/player.dat").to_vec());
+    let root_tag = read_gzip_compound_tag(&mut cursor).unwrap();
+
+    assert_eq!(
+        root_tag.to_string(),
+        include_str!("../test/text/player.txt")
+    );
+}
+
+#[test]
+fn test_level_display() {
+    use crate::decode::read_gzip_compound_tag;
+    use std::io::Cursor;
+
+    let mut cursor = Cursor::new(include_bytes!("../test/binary/level.dat").to_vec());
+    let root_tag = read_gzip_compound_tag(&mut cursor).unwrap();
+
+    assert_eq!(root_tag.to_string(), include_str!("../test/text/level.txt"));
 }

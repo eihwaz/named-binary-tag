@@ -5,37 +5,37 @@ use std::io::{Error, Write};
 
 pub fn write_gzip_compound_tag<W: Write>(
     writer: &mut W,
-    name: &str,
     compound_tag: CompoundTag,
 ) -> Result<(), Error> {
     write_compound_tag(
         &mut GzEncoder::new(writer, Default::default()),
-        name,
         compound_tag,
     )
 }
 
 pub fn write_zlib_compound_tag<W: Write>(
     writer: &mut W,
-    name: &str,
     compound_tag: CompoundTag,
 ) -> Result<(), Error> {
     write_compound_tag(
         &mut ZlibEncoder::new(writer, Default::default()),
-        name,
         compound_tag,
     )
 }
 
 pub fn write_compound_tag<W: Write>(
     writer: &mut W,
-    name: &str,
     compound_tag: CompoundTag,
 ) -> Result<(), Error> {
+    let name = compound_tag.name.clone();
     let tag = Tag::Compound(compound_tag);
+    writer.write_u8(tag.type_id())?;
 
-    writer.write_u8(tag.id())?;
-    write_string(writer, name.to_owned())?;
+    match name {
+        Some(value) => write_string(writer, value.to_owned())?,
+        None => write_string(writer, String::from(""))?,
+    }
+
     write_tag(writer, tag)
 }
 
@@ -57,7 +57,7 @@ fn write_tag<W: Write>(writer: &mut W, tag: Tag) -> Result<(), Error> {
         Tag::String(value) => write_string(writer, value)?,
         Tag::List(value) => {
             if value.len() > 0 {
-                writer.write_u8(value[0].id())?;
+                writer.write_u8(value[0].type_id())?;
             } else {
                 // Empty list type.
                 writer.write_u8(0)?;
@@ -71,7 +71,7 @@ fn write_tag<W: Write>(writer: &mut W, tag: Tag) -> Result<(), Error> {
         }
         Tag::Compound(value) => {
             for (name, tag) in value.tags {
-                writer.write_u8(tag.id())?;
+                writer.write_u8(tag.type_id())?;
                 write_string(writer, name)?;
                 write_tag(writer, tag)?;
             }
@@ -107,13 +107,16 @@ fn write_string<W: Write>(writer: &mut W, value: String) -> Result<(), Error> {
 
 #[test]
 fn test_hello_world_write() {
-    let mut hello_world = CompoundTag::new();
+    let mut hello_world = CompoundTag::named("hello world");
     hello_world.insert_str("name", "Bananrama");
 
     let mut vec = Vec::new();
-    write_compound_tag(&mut vec, "hello world", hello_world).unwrap();
+    write_compound_tag(&mut vec, hello_world).unwrap();
 
-    assert_eq!(vec, include_bytes!("../test/hello_world.dat").to_vec());
+    assert_eq!(
+        vec,
+        include_bytes!("../test/binary/hello_world.dat").to_vec()
+    );
 }
 
 #[test]
@@ -131,7 +134,7 @@ fn test_servers_write() {
     root_tag.insert_compound_tag_vec("servers", servers);
 
     let mut vec = Vec::new();
-    write_compound_tag(&mut vec, "", root_tag).unwrap();
+    write_compound_tag(&mut vec, root_tag).unwrap();
 
-    assert_eq!(vec, include_bytes!("../test/servers.dat").to_vec());
+    assert_eq!(vec, include_bytes!("../test/binary/servers.dat").to_vec());
 }

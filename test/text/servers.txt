@@ -1,0 +1,9 @@
+TAG_Compound(''): 1 entry {
+  TAG_List('servers'): 1 entry {
+    TAG_Compound(''): 3 entries {
+      TAG_String('ip'): 'localhost:25565'
+      TAG_String('name'): 'Minecraft Server'
+      TAG_Byte('hideAddress'): '1'
+    }
+  }
+}

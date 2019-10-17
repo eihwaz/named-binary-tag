@@ -28,32 +28,30 @@ impl From<io::Error> for TagDecodeError {
     }
 }
 
-pub fn read_gzip_compound_tag<R: Read>(
-    reader: &mut R,
-) -> Result<(String, CompoundTag), TagDecodeError> {
+pub fn read_gzip_compound_tag<R: Read>(reader: &mut R) -> Result<CompoundTag, TagDecodeError> {
     read_compound_tag(&mut GzDecoder::new(reader))
 }
 
-pub fn read_zlib_compound_tag<R: Read>(
-    reader: &mut R,
-) -> Result<(String, CompoundTag), TagDecodeError> {
+pub fn read_zlib_compound_tag<R: Read>(reader: &mut R) -> Result<CompoundTag, TagDecodeError> {
     read_compound_tag(&mut ZlibDecoder::new(reader))
 }
 
-pub fn read_compound_tag<'a, R: Read>(
-    reader: &mut R,
-) -> Result<(String, CompoundTag), TagDecodeError> {
+pub fn read_compound_tag<'a, R: Read>(reader: &mut R) -> Result<CompoundTag, TagDecodeError> {
     let tag_id = reader.read_u8()?;
     let name = read_string(reader)?;
-    let tag = read_tag(tag_id, reader)?;
+    let tag = read_tag(tag_id, Some(name.as_str()), reader)?;
 
     match tag {
-        Tag::Compound(value) => Ok((name, value)),
+        Tag::Compound(value) => Ok(value),
         actual_tag => Err(TagDecodeError::RootMustBeCompoundTag { actual_tag }),
     }
 }
 
-fn read_tag<R: Read>(tag_id: u8, reader: &mut R) -> Result<Tag, TagDecodeError> {
+fn read_tag<R: Read>(
+    tag_id: u8,
+    name: Option<&str>,
+    reader: &mut R,
+) -> Result<Tag, TagDecodeError> {
     match tag_id {
         1 => {
             let value = reader.read_i8()?;
@@ -106,7 +104,7 @@ fn read_tag<R: Read>(tag_id: u8, reader: &mut R) -> Result<Tag, TagDecodeError> 
             let mut value = Vec::new();
 
             for _ in 0..length {
-                value.push(read_tag(list_tags_id, reader)?);
+                value.push(read_tag(list_tags_id, None, reader)?);
             }
 
             return Ok(Tag::List(value));
@@ -123,12 +121,15 @@ fn read_tag<R: Read>(tag_id: u8, reader: &mut R) -> Result<Tag, TagDecodeError> 
                 }
 
                 let name = read_string(reader)?;
-                let tag = read_tag(tag_id, reader)?;
+                let tag = read_tag(tag_id, Some(name.as_str()), reader)?;
 
                 tags.insert(name, tag);
             }
 
-            let compound_tag = CompoundTag { tags };
+            let compound_tag = CompoundTag {
+                name: name.map(|s| s.into()),
+                tags,
+            };
 
             return Ok(Tag::Compound(compound_tag));
         }
@@ -168,10 +169,10 @@ fn read_string<R: Read>(reader: &mut R) -> Result<String, TagDecodeError> {
 fn test_hello_world_read() {
     use std::io::Cursor;
 
-    let mut cursor = Cursor::new(include_bytes!("../test/hello_world.dat").to_vec());
-    let (name, hello_world) = read_compound_tag(&mut cursor).unwrap();
+    let mut cursor = Cursor::new(include_bytes!("../test/binary/hello_world.dat").to_vec());
+    let hello_world = read_compound_tag(&mut cursor).unwrap();
 
-    assert_eq!(name, "hello world");
+    assert_eq!(hello_world.name.as_ref().unwrap(), "hello world");
     assert_eq!(hello_world.get_str("name").unwrap(), "Bananrama");
 }
 
@@ -179,10 +180,10 @@ fn test_hello_world_read() {
 fn test_servers_read() {
     use std::io::Cursor;
 
-    let mut cursor = Cursor::new(include_bytes!("../test/servers.dat").to_vec());
-    let (name, root_tag) = read_compound_tag(&mut cursor).unwrap();
+    let mut cursor = Cursor::new(include_bytes!("../test/binary/servers.dat").to_vec());
+    let root_tag = read_compound_tag(&mut cursor).unwrap();
 
-    assert!(name.is_empty());
+    assert!(root_tag.name.as_ref().unwrap().is_empty());
     let servers = root_tag.get_compound_tag_vec("servers").unwrap();
     assert_eq!(servers.len(), 1);
 
@@ -200,10 +201,10 @@ fn test_servers_read() {
 fn test_big_test_read() {
     use std::io::Cursor;
 
-    let mut cursor = Cursor::new(include_bytes!("../test/bigtest.dat").to_vec());
-    let (name, root_tag) = read_gzip_compound_tag(&mut cursor).unwrap();
+    let mut cursor = Cursor::new(include_bytes!("../test/binary/bigtest.dat").to_vec());
+    let root_tag = read_gzip_compound_tag(&mut cursor).unwrap();
 
-    assert_eq!(name, "Level");
+    assert_eq!(root_tag.name.as_ref().unwrap(), "Level");
     assert_eq!(root_tag.get_i8("byteTest").unwrap(), i8::max_value());
     assert_eq!(root_tag.get_i16("shortTest").unwrap(), i16::max_value());
     assert_eq!(root_tag.get_i32("intTest").unwrap(), i32::max_value());
