@@ -10,5 +10,5 @@ Add this to your `Cargo.toml`:
 
 ```toml
 [dependencies]
-named-binary-tag = "0.1"
+named-binary-tag = "0.2"
 ```
