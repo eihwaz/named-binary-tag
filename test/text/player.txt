@@ -1,0 +1,87 @@
+TAG_Compound(''): 40 entries {
+  TAG_Int('SelectedItemSlot'): '6'
+  TAG_Long('UUIDLeast'): '-7667707954964142219'
+  TAG_List('Attributes'): 4 entries {
+    TAG_Compound(''): 2 entries {
+      TAG_String('Name'): 'generic.maxHealth'
+      TAG_Double('Base'): '20'
+    }
+    TAG_Compound(''): 2 entries {
+      TAG_String('Name'): 'generic.knockbackResistance'
+      TAG_Double('Base'): '0'
+    }
+    TAG_Compound(''): 2 entries {
+      TAG_String('Name'): 'generic.movementSpeed'
+      TAG_Double('Base'): '0.10000000149011612'
+    }
+    TAG_Compound(''): 2 entries {
+      TAG_String('Name'): 'generic.attackDamage'
+      TAG_Double('Base'): '1'
+    }
+  }
+  TAG_List('Motion'): 3 entries {
+    TAG_Double(''): '0'
+    TAG_Double(''): '0'
+    TAG_Double(''): '0'
+  }
+  TAG_Float('foodExhaustionLevel'): '0'
+  TAG_Int('foodTickTimer'): '0'
+  TAG_Int('XpLevel'): '0'
+  TAG_Short('Health'): '20'
+  TAG_Int('XpSeed'): '0'
+  TAG_Float('HealF'): '20'
+  TAG_Compound('bukkit'): 8 entries {
+    TAG_Long('firstPlayed'): '1437658456969'
+    TAG_Int('newExp'): '0'
+    TAG_Int('newTotalExp'): '0'
+    TAG_Byte('keepLevel'): '0'
+    TAG_String('lastKnownName'): 'SolomonSolomon'
+    TAG_Long('lastPlayed'): '1437658860919'
+    TAG_Int('newLevel'): '0'
+    TAG_Int('expToDrop'): '0'
+  }
+  TAG_List('Inventory'): 0 entries
+  TAG_Int('Bukkit.updateLevel'): '2'
+  TAG_Byte('Sleeping'): '0'
+  TAG_Short('Fire'): '-20'
+  TAG_Int('playerGameType'): '0'
+  TAG_Int('foodLevel'): '20'
+  TAG_Int('Score'): '0'
+  TAG_Byte('Invulnerable'): '0'
+  TAG_Short('DeathTime'): '0'
+  TAG_List('EnderItems'): 0 entries
+  TAG_Float('XpP'): '0'
+  TAG_Short('SleepTimer'): '0'
+  TAG_Float('AbsorptionAmount'): '0'
+  TAG_Byte('OnGround'): '0'
+  TAG_Short('HurtTime'): '0'
+  TAG_Long('UUIDMost'): '9202049530804310501'
+  TAG_Int('HurtByTimestamp'): '4101'
+  TAG_String('SpawnWorld'): ''
+  TAG_Int('Dimension'): '0'
+  TAG_Long('WorldUUIDLeast'): '-8756449911857688408'
+  TAG_Short('Air'): '300'
+  TAG_List('Pos'): 3 entries {
+    TAG_Double(''): '1.5'
+    TAG_Double(''): '80'
+    TAG_Double(''): '0.5'
+  }
+  TAG_Float('foodSaturationLevel'): '5'
+  TAG_Int('PortalCooldown'): '0'
+  TAG_Compound('abilities'): 7 entries {
+    TAG_Byte('flying'): '0'
+    TAG_Byte('instabuild'): '0'
+    TAG_Byte('mayfly'): '0'
+    TAG_Byte('invulnerable'): '0'
+    TAG_Byte('mayBuild'): '1'
+    TAG_Float('flySpeed'): '0.05'
+    TAG_Float('walkSpeed'): '0.1'
+  }
+  TAG_Long('WorldUUIDMost'): '-551444479365527077'
+  TAG_Float('FallDistance'): '0'
+  TAG_Int('XpTotal'): '0'
+  TAG_List('Rotation'): 2 entries {
+    TAG_Float(''): '0'
+    TAG_Float(''): '0'
+  }
+}

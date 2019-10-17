@@ -59,7 +59,7 @@ impl Tag {
 
 #[derive(Debug, Clone)]
 pub struct CompoundTag {
-    pub name: String,
+    pub name: Option<String>,
     tags: LinkedHashMap<String, Tag>,
 }
 
@@ -117,9 +117,16 @@ macro_rules! define_array_type (
 );
 
 impl CompoundTag {
-    pub fn new(name: &str) -> Self {
+    pub fn new() -> Self {
         CompoundTag {
-            name: name.to_owned(),
+            name: None,
+            tags: LinkedHashMap::new(),
+        }
+    }
+
+    pub fn named(name: &str) -> Self {
+        CompoundTag {
+            name: Some(name.to_owned()),
             tags: LinkedHashMap::new(),
         }
     }
@@ -242,11 +249,12 @@ impl CompoundTag {
 
 impl Display for CompoundTag {
     fn fmt(&self, f: &mut Formatter<'_>) -> Result<(), Error> {
-        fmt_tag(f, self.name.as_str(), &Tag::Compound(self.clone()), 0)
+        let name_ref = self.name.as_ref().map(|x| &**x);
+        fmt_tag(f, name_ref, &Tag::Compound(self.clone()), 0)
     }
 }
 
-fn fmt_tag(f: &mut Formatter, name: &str, tag: &Tag, indent: usize) -> Result<(), Error> {
+fn fmt_tag(f: &mut Formatter, name: Option<&str>, tag: &Tag, indent: usize) -> Result<(), Error> {
     fmt_indent(f, indent)?;
 
     let type_name = tag.type_name();
@@ -266,7 +274,7 @@ fn fmt_tag(f: &mut Formatter, name: &str, tag: &Tag, indent: usize) -> Result<()
             fmt_list_start(f, type_name, name, length)?;
 
             for tag in value {
-                fmt_tag(f, "", tag, indent + 2)?;
+                fmt_tag(f, None, tag, indent + 2)?;
             }
 
             if length > 0 {
@@ -274,12 +282,13 @@ fn fmt_tag(f: &mut Formatter, name: &str, tag: &Tag, indent: usize) -> Result<()
             }
         }
         Tag::Compound(value) => {
+            let name_ref = name.as_ref().map(|x| &**x);
             let length = value.tags.len();
 
-            fmt_list_start(f, type_name, &value.name, length)?;
+            fmt_list_start(f, type_name, name_ref, length)?;
 
             for (name, tag) in &value.tags {
-                fmt_tag(f, name, tag, indent + 2)?;
+                fmt_tag(f, Some(name.as_str()), tag, indent + 2)?;
             }
 
             if length > 0 {
@@ -296,31 +305,33 @@ fn fmt_tag(f: &mut Formatter, name: &str, tag: &Tag, indent: usize) -> Result<()
 fn fmt_simple_tag<V: Display>(
     f: &mut Formatter,
     type_name: &str,
-    name: &str,
+    name: Option<&str>,
     value: V,
 ) -> Result<(), Error> {
-    writeln!(f, "{}('{}'): '{}'", type_name, name, value)
+    writeln!(f, "{}('{}'): '{}'", type_name, fmt_str_opt(name), value)
 }
 
 fn fmt_array_tag<V: Debug>(
     f: &mut Formatter,
     type_name: &str,
-    name: &str,
+    name: Option<&str>,
     value: V,
 ) -> Result<(), Error> {
-    writeln!(f, "{}('{}'): '{:?}'", type_name, name, value)
+    writeln!(f, "{}('{}'): '{:?}'", type_name, fmt_str_opt(name), value)
 }
 
 fn fmt_list_start(
     f: &mut Formatter,
     type_name: &str,
-    name: &str,
+    name: Option<&str>,
     length: usize,
 ) -> Result<(), Error> {
+    let fmt_name = fmt_str_opt(name);
+
     match length {
-        0 => writeln!(f, "{}('{}'): 0 entries", type_name, name),
-        1 => writeln!(f, "{}('{}'): 1 entry {{", type_name, name),
-        _ => writeln!(f, "{}('{}'): {} entries {{", type_name, name, length),
+        0 => writeln!(f, "{}('{}'): 0 entries", type_name, fmt_name),
+        1 => writeln!(f, "{}('{}'): 1 entry {{", type_name, fmt_name),
+        _ => writeln!(f, "{}('{}'): {} entries {{", type_name, fmt_name, length),
     }
 }
 
@@ -333,9 +344,16 @@ fn fmt_indent(f: &mut Formatter, indent: usize) -> Result<(), Error> {
     write!(f, "{:indent$}", "", indent = indent)
 }
 
+fn fmt_str_opt(name: Option<&str>) -> &str {
+    match name {
+        Some(value) => value,
+        None => "",
+    }
+}
+
 #[test]
 fn test_compound_tag_i8() {
-    let mut compound_tag = CompoundTag::new("");
+    let mut compound_tag = CompoundTag::new();
     compound_tag.insert_i8("i8", 1);
 
     assert_eq!(compound_tag.get_i8("i8").unwrap(), 1i8);
@@ -343,7 +361,7 @@ fn test_compound_tag_i8() {
 
 #[test]
 fn test_compound_tag_bool() {
-    let mut compound_tag = CompoundTag::new("");
+    let mut compound_tag = CompoundTag::new();
     compound_tag.insert_bool("bool", true);
 
     assert!(compound_tag.get_bool("bool").unwrap());
@@ -351,7 +369,7 @@ fn test_compound_tag_bool() {
 
 #[test]
 fn test_compound_tag_i16() {
-    let mut compound_tag = CompoundTag::new("");
+    let mut compound_tag = CompoundTag::new();
     compound_tag.insert_i16("i16", 2);
 
     assert_eq!(compound_tag.get_i16("i16").unwrap(), 2i16);
@@ -359,7 +377,7 @@ fn test_compound_tag_i16() {
 
 #[test]
 fn test_compound_tag_i32() {
-    let mut compound_tag = CompoundTag::new("");
+    let mut compound_tag = CompoundTag::new();
     compound_tag.insert_i32("i32", 3);
 
     assert_eq!(compound_tag.get_i32("i32").unwrap(), 3i32);
@@ -367,7 +385,7 @@ fn test_compound_tag_i32() {
 
 #[test]
 fn test_compound_tag_i64() {
-    let mut compound_tag = CompoundTag::new("");
+    let mut compound_tag = CompoundTag::new();
     compound_tag.insert_i64("i64", 4);
 
     assert_eq!(compound_tag.get_i64("i64").unwrap(), 4i64);
@@ -375,7 +393,7 @@ fn test_compound_tag_i64() {
 
 #[test]
 fn test_compound_tag_f32() {
-    let mut compound_tag = CompoundTag::new("");
+    let mut compound_tag = CompoundTag::new();
     compound_tag.insert_f32("f32", 5.1);
 
     assert_eq!(compound_tag.get_f32("f32").unwrap(), 5.1f32);
@@ -383,7 +401,7 @@ fn test_compound_tag_f32() {
 
 #[test]
 fn test_compound_tag_f64() {
-    let mut compound_tag = CompoundTag::new("");
+    let mut compound_tag = CompoundTag::new();
     compound_tag.insert_f64("f64", 6.3322);
 
     assert_eq!(compound_tag.get_f64("f64").unwrap(), 6.3322f64);
@@ -391,7 +409,7 @@ fn test_compound_tag_f64() {
 
 #[test]
 fn test_compound_tag_str() {
-    let mut compound_tag = CompoundTag::new("");
+    let mut compound_tag = CompoundTag::new();
     compound_tag.insert_str("str", "hello world");
 
     assert_eq!(compound_tag.get_str("str").unwrap(), "hello world");
@@ -399,8 +417,8 @@ fn test_compound_tag_str() {
 
 #[test]
 fn test_compound_tag_nested_compound_tag() {
-    let mut compound_tag = CompoundTag::new("");
-    let mut insert_nested_compound_tag = CompoundTag::new("nested");
+    let mut compound_tag = CompoundTag::new();
+    let mut insert_nested_compound_tag = CompoundTag::named("nested");
     insert_nested_compound_tag.insert_i8("i8", 1);
     insert_nested_compound_tag.insert_str("str", "hello world");
 
@@ -419,7 +437,7 @@ fn test_compound_tag_nested_compound_tag() {
 
 #[test]
 fn test_compound_tag_i8_vec() {
-    let mut compound_tag = CompoundTag::new("");
+    let mut compound_tag = CompoundTag::new();
     compound_tag.insert_i8_vec("i8_vec", vec![0, 1]);
 
     let i8_vec = compound_tag.get_i8_vec("i8_vec").unwrap();
@@ -429,7 +447,7 @@ fn test_compound_tag_i8_vec() {
 
 #[test]
 fn test_compound_tag_i32_vec() {
-    let mut compound_tag = CompoundTag::new("");
+    let mut compound_tag = CompoundTag::new();
     compound_tag.insert_i32_vec("i32_vec", vec![7, 8, 9]);
 
     let i32_vec = compound_tag.get_i32_vec("i32_vec").unwrap();
@@ -441,7 +459,7 @@ fn test_compound_tag_i32_vec() {
 
 #[test]
 fn test_compound_tag_i64_vec() {
-    let mut compound_tag = CompoundTag::new("");
+    let mut compound_tag = CompoundTag::new();
     compound_tag.insert_i64_vec("i64_vec", vec![10, 11, 12]);
     let i64_vec = compound_tag.get_i64_vec("i64_vec").unwrap();
 
@@ -452,7 +470,7 @@ fn test_compound_tag_i64_vec() {
 
 #[test]
 fn test_compound_tag_str_vec() {
-    let mut compound_tag = CompoundTag::new("");
+    let mut compound_tag = CompoundTag::new();
     let insert_str_vec = vec!["a", "b", "c"];
 
     compound_tag.insert_str_vec("str_vec", insert_str_vec);
@@ -465,9 +483,9 @@ fn test_compound_tag_str_vec() {
 
 #[test]
 fn test_compound_tag_nested_compound_tag_vec() {
-    let mut compound_tag = CompoundTag::new("");
-    let mut insert_nested_compound_tag_1 = CompoundTag::new("");
-    let mut insert_nested_compound_tag_2 = CompoundTag::new("");
+    let mut compound_tag = CompoundTag::new();
+    let mut insert_nested_compound_tag_1 = CompoundTag::new();
+    let mut insert_nested_compound_tag_2 = CompoundTag::new();
 
     insert_nested_compound_tag_1.insert_str("str", "test");
     insert_nested_compound_tag_2.insert_i32("i32", 222333111);
@@ -490,17 +508,53 @@ fn test_compound_tag_nested_compound_tag_vec() {
 
 #[test]
 fn test_servers_display() {
-    let mut server = CompoundTag::new("");
+    use crate::decode::read_compound_tag;
+    use std::io::Cursor;
 
-    server.insert_str("ip", "localhost:25565");
-    server.insert_str("name", "Minecraft Server");
-    server.insert_bool("hideAddress", true);
+    let mut cursor = Cursor::new(include_bytes!("../test/binary/servers.dat").to_vec());
+    let root_tag = read_compound_tag(&mut cursor).unwrap();
 
-    let mut servers = Vec::new();
-    servers.push(server);
+    assert_eq!(
+        root_tag.to_string(),
+        include_str!("../test/text/servers.txt")
+    );
+}
 
-    let mut root_tag = CompoundTag::new("");
-    root_tag.insert_compound_tag_vec("servers", servers);
+#[test]
+fn test_hello_world_display() {
+    use crate::decode::read_compound_tag;
+    use std::io::Cursor;
 
-    assert_eq!(root_tag.to_string(), include_str!("../test/servers.txt"));
+    let mut cursor = Cursor::new(include_bytes!("../test/binary/hello_world.dat").to_vec());
+    let root_tag = read_compound_tag(&mut cursor).unwrap();
+
+    assert_eq!(
+        root_tag.to_string(),
+        include_str!("../test/text/hello_world.txt")
+    );
+}
+
+#[test]
+fn test_player_display() {
+    use crate::decode::read_gzip_compound_tag;
+    use std::io::Cursor;
+
+    let mut cursor = Cursor::new(include_bytes!("../test/binary/player.dat").to_vec());
+    let root_tag = read_gzip_compound_tag(&mut cursor).unwrap();
+
+    assert_eq!(
+        root_tag.to_string(),
+        include_str!("../test/text/player.txt")
+    );
+}
+
+#[test]
+fn test_level_display() {
+    use crate::decode::read_gzip_compound_tag;
+    use std::io::Cursor;
+
+    let mut cursor = Cursor::new(include_bytes!("../test/binary/level.dat").to_vec());
+    let root_tag = read_gzip_compound_tag(&mut cursor).unwrap();
+
+    assert_eq!(root_tag.to_string(), include_str!("../test/text/level.txt"));
 }

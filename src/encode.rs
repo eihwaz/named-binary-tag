@@ -29,9 +29,13 @@ pub fn write_compound_tag<W: Write>(
 ) -> Result<(), Error> {
     let name = compound_tag.name.clone();
     let tag = Tag::Compound(compound_tag);
-
     writer.write_u8(tag.type_id())?;
-    write_string(writer, name)?;
+
+    match name {
+        Some(value) => write_string(writer, value.to_owned())?,
+        None => write_string(writer, String::from(""))?,
+    }
+
     write_tag(writer, tag)
 }
 
@@ -103,18 +107,21 @@ fn write_string<W: Write>(writer: &mut W, value: String) -> Result<(), Error> {
 
 #[test]
 fn test_hello_world_write() {
-    let mut hello_world = CompoundTag::new("hello world");
+    let mut hello_world = CompoundTag::named("hello world");
     hello_world.insert_str("name", "Bananrama");
 
     let mut vec = Vec::new();
     write_compound_tag(&mut vec, hello_world).unwrap();
 
-    assert_eq!(vec, include_bytes!("../test/hello_world.dat").to_vec());
+    assert_eq!(
+        vec,
+        include_bytes!("../test/binary/hello_world.dat").to_vec()
+    );
 }
 
 #[test]
 fn test_servers_write() {
-    let mut server = CompoundTag::new("");
+    let mut server = CompoundTag::new();
 
     server.insert_str("ip", "localhost:25565");
     server.insert_str("name", "Minecraft Server");
@@ -123,11 +130,11 @@ fn test_servers_write() {
     let mut servers = Vec::new();
     servers.push(server);
 
-    let mut root_tag = CompoundTag::new("");
+    let mut root_tag = CompoundTag::new();
     root_tag.insert_compound_tag_vec("servers", servers);
 
     let mut vec = Vec::new();
     write_compound_tag(&mut vec, root_tag).unwrap();
 
-    assert_eq!(vec, include_bytes!("../test/servers.dat").to_vec());
+    assert_eq!(vec, include_bytes!("../test/binary/servers.dat").to_vec());
 }
