@@ -472,15 +472,5 @@ fn test_servers_display() {
     let mut root_tag = CompoundTag::new("");
     root_tag.insert_compound_tag_vec("servers", servers);
 
-    let expected = "TAG_Compound(''): 1 entry {
-  TAG_List('servers'): 1 entry {
-    TAG_Compound(''): 3 entries {
-      TAG_String('ip'): 'localhost:25565'
-      TAG_String('name'): 'Minecraft Server'
-      TAG_Byte('hideAddress'): '1'
-    }
-  }
-}";
-
-    assert_eq!(root_tag.to_string().trim(), expected);
+    assert_eq!(root_tag.to_string(), include_str!("../test/servers.txt"));
 }
