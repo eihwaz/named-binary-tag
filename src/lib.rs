@@ -1,5 +1,5 @@
 use linked_hash_map::LinkedHashMap;
-use std::fmt::{Display, Error, Formatter};
+use std::fmt::{Debug, Display, Error, Formatter};
 
 pub mod decode;
 pub mod encode;
@@ -246,61 +246,91 @@ impl Display for CompoundTag {
     }
 }
 
-fn fmt_tag(f: &mut Formatter<'_>, name: &str, tag: &Tag, indent: usize) -> Result<(), Error> {
-    write!(f, "{:indent$}", "", indent = indent)?;
+fn fmt_tag(f: &mut Formatter, name: &str, tag: &Tag, indent: usize) -> Result<(), Error> {
+    fmt_indent(f, indent)?;
+
     let type_name = tag.type_name();
 
     match tag {
-        Tag::Byte(value) => writeln!(f, "{}('{}'): '{}'", type_name, name, value)?,
-        Tag::Short(value) => writeln!(f, "{}('{}'): '{}'", type_name, name, value)?,
-        Tag::Int(value) => writeln!(f, "{}('{}'): '{}'", type_name, name, value)?,
-        Tag::Long(value) => writeln!(f, "{}('{}'): '{}'", type_name, name, value)?,
-        Tag::Float(value) => writeln!(f, "{}('{}'): '{}'", type_name, name, value)?,
-        Tag::Double(value) => writeln!(f, "{}('{}'): '{}'", type_name, name, value)?,
-        Tag::ByteArray(value) => writeln!(f, "{}('{}'): '{:?}'", type_name, name, value)?,
-        Tag::String(value) => writeln!(f, "{}('{}'): '{}'", type_name, name, value)?,
+        Tag::Byte(value) => fmt_simple_tag(f, type_name, name, value)?,
+        Tag::Short(value) => fmt_simple_tag(f, type_name, name, value)?,
+        Tag::Int(value) => fmt_simple_tag(f, type_name, name, value)?,
+        Tag::Long(value) => fmt_simple_tag(f, type_name, name, value)?,
+        Tag::Float(value) => fmt_simple_tag(f, type_name, name, value)?,
+        Tag::Double(value) => fmt_simple_tag(f, type_name, name, value)?,
+        Tag::ByteArray(value) => fmt_array_tag(f, type_name, name, value)?,
+        Tag::String(value) => fmt_simple_tag(f, type_name, name, value)?,
         Tag::List(value) => {
             let length = value.len();
 
-            match length {
-                0 => writeln!(f, "{}('{}'): 0 entries", type_name, name)?,
-                1 => writeln!(f, "{}('{}'): 1 entry {{", type_name, name)?,
-                _ => writeln!(f, "{}('{}'): {} entries {{", type_name, name, length)?,
-            }
+            fmt_list_start(f, type_name, name, length)?;
 
             for tag in value {
                 fmt_tag(f, "", tag, indent + 2)?;
             }
 
             if length > 0 {
-                write!(f, "{:indent$}", "", indent = indent)?;
-                writeln!(f, "}}")?;
+                fmt_list_end(f, indent)?;
             }
         }
         Tag::Compound(value) => {
-            let name = &value.name;
             let length = value.tags.len();
 
-            match length {
-                0 => writeln!(f, "{}('{}'): 0 entries", type_name, name)?,
-                1 => writeln!(f, "{}('{}'): 1 entry {{", type_name, name)?,
-                _ => writeln!(f, "{}('{}'): {} entries {{", type_name, name, length)?,
-            }
+            fmt_list_start(f, type_name, &value.name, length)?;
 
             for (name, tag) in &value.tags {
                 fmt_tag(f, name, tag, indent + 2)?;
             }
 
             if length > 0 {
-                write!(f, "{:indent$}", "", indent = indent)?;
-                writeln!(f, "}}")?;
+                fmt_list_end(f, indent)?;
             }
         }
-        Tag::IntArray(value) => writeln!(f, "{}('{}'): '{:?}'", type_name, name, value)?,
-        Tag::LongArray(value) => writeln!(f, "{}('{}'): '{:?}'", type_name, name, value)?,
+        Tag::IntArray(value) => fmt_array_tag(f, type_name, name, value)?,
+        Tag::LongArray(value) => fmt_array_tag(f, type_name, name, value)?,
     };
 
     Ok(())
+}
+
+fn fmt_simple_tag<V: Display>(
+    f: &mut Formatter,
+    type_name: &str,
+    name: &str,
+    value: V,
+) -> Result<(), Error> {
+    writeln!(f, "{}('{}'): '{}'", type_name, name, value)
+}
+
+fn fmt_array_tag<V: Debug>(
+    f: &mut Formatter,
+    type_name: &str,
+    name: &str,
+    value: V,
+) -> Result<(), Error> {
+    writeln!(f, "{}('{}'): '{:?}'", type_name, name, value)
+}
+
+fn fmt_list_start(
+    f: &mut Formatter,
+    type_name: &str,
+    name: &str,
+    length: usize,
+) -> Result<(), Error> {
+    match length {
+        0 => writeln!(f, "{}('{}'): 0 entries", type_name, name),
+        1 => writeln!(f, "{}('{}'): 1 entry {{", type_name, name),
+        _ => writeln!(f, "{}('{}'): {} entries {{", type_name, name, length),
+    }
+}
+
+fn fmt_list_end(f: &mut Formatter, indent: usize) -> Result<(), Error> {
+    fmt_indent(f, indent)?;
+    writeln!(f, "}}")
+}
+
+fn fmt_indent(f: &mut Formatter, indent: usize) -> Result<(), Error> {
+    write!(f, "{:indent$}", "", indent = indent)
 }
 
 #[test]
