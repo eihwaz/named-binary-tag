@@ -131,6 +131,10 @@ impl CompoundTag {
         }
     }
 
+    pub fn is_empty(&self) -> bool {
+        self.tags.is_empty()
+    }
+
     define_primitive_type!(i8, Byte, get_i8, insert_i8);
     define_primitive_type!(i16, Short, get_i16, insert_i16);
     define_primitive_type!(i32, Int, get_i32, insert_i32);
