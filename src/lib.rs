@@ -1,3 +1,51 @@
+//! NBT (Named Binary Tag) is a tag based binary format designed to carry large
+//! amounts of binary data with smaller amounts of additional data.
+//!
+//! # Examples
+//!
+//! ## Read
+//!
+//! ```
+//! use nbt::decode::read_compound_tag;
+//! use std::io::Cursor;
+//!
+//! let mut cursor = Cursor::new(include_bytes!("../test/binary/servers.dat").to_vec());
+//! let root_tag = read_compound_tag(&mut cursor).unwrap();
+//!
+//! let servers = root_tag.get_compound_tag_vec("servers").unwrap();
+//! assert_eq!(servers.len(), 1);
+//!
+//! let server = servers[0];
+//! let ip = server.get_str("ip").unwrap();
+//! let name = server.get_str("name").unwrap();
+//! let hide_address = server.get_bool("hideAddress").unwrap();
+//!
+//! assert_eq!(ip, "localhost:25565");
+//! assert_eq!(name, "Minecraft Server");
+//! assert!(hide_address);
+//! ```
+//!
+//! ## Write
+//!
+//! ```
+//! use nbt::encode::write_compound_tag;
+//! use nbt::CompoundTag;
+//!
+//! let mut server = CompoundTag::new();
+//!
+//! server.insert_str("ip", "localhost:25565");
+//! server.insert_str("name", "Minecraft Server");
+//! server.insert_bool("hideAddress", true);
+//!
+//! let mut servers = Vec::new();
+//! servers.push(server);
+//!
+//! let mut root_tag = CompoundTag::new();
+//! root_tag.insert_compound_tag_vec("servers", servers);
+//!
+//! let mut vec = Vec::new();
+//! write_compound_tag(&mut vec, root_tag).unwrap();
+//! ```
 use linked_hash_map::LinkedHashMap;
 use std::fmt::{Debug, Display, Error, Formatter};
 
