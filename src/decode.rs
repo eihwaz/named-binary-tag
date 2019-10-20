@@ -28,14 +28,38 @@ impl From<io::Error> for TagDecodeError {
     }
 }
 
+/// Read a compound tag from a reader compressed with gzip.
 pub fn read_gzip_compound_tag<R: Read>(reader: &mut R) -> Result<CompoundTag, TagDecodeError> {
     read_compound_tag(&mut GzDecoder::new(reader))
 }
 
+/// Read a compound tag from a reader compressed with zlib.
 pub fn read_zlib_compound_tag<R: Read>(reader: &mut R) -> Result<CompoundTag, TagDecodeError> {
     read_compound_tag(&mut ZlibDecoder::new(reader))
 }
 
+/// Read a compound tag from a reader.
+///
+/// # Example
+/// ```
+/// use nbt::decode::read_compound_tag;
+/// use std::io::Cursor;
+///
+/// let mut cursor = Cursor::new(include_bytes!("../test/binary/servers.dat").to_vec());
+/// let root_tag = read_compound_tag(&mut cursor).unwrap();
+///
+/// let servers = root_tag.get_compound_tag_vec("servers").unwrap();
+/// assert_eq!(servers.len(), 1);
+///
+/// let server = servers[0];
+/// let ip = server.get_str("ip").unwrap();
+/// let name = server.get_str("name").unwrap();
+/// let hide_address = server.get_bool("hideAddress").unwrap();
+///
+/// assert_eq!(ip, "localhost:25565");
+/// assert_eq!(name, "Minecraft Server");
+/// assert!(hide_address);
+/// ```
 pub fn read_compound_tag<'a, R: Read>(reader: &mut R) -> Result<CompoundTag, TagDecodeError> {
     let tag_id = reader.read_u8()?;
     let name = read_string(reader)?;

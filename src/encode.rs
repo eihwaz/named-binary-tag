@@ -3,6 +3,7 @@ use byteorder::{BigEndian, WriteBytesExt};
 use flate2::write::{GzEncoder, ZlibEncoder};
 use std::io::{Error, Write};
 
+/// Write a compound tag to writer using gzip compression.
 pub fn write_gzip_compound_tag<W: Write>(
     writer: &mut W,
     compound_tag: CompoundTag,
@@ -13,6 +14,7 @@ pub fn write_gzip_compound_tag<W: Write>(
     )
 }
 
+/// Write a compound tag to writer using zlib compression.
 pub fn write_zlib_compound_tag<W: Write>(
     writer: &mut W,
     compound_tag: CompoundTag,
@@ -23,6 +25,28 @@ pub fn write_zlib_compound_tag<W: Write>(
     )
 }
 
+/// Write a compound tag to writer.
+///
+/// # Example
+/// ```
+/// use nbt::encode::write_compound_tag;
+/// use nbt::CompoundTag;
+///
+/// let mut server = CompoundTag::new();
+///
+/// server.insert_str("ip", "localhost:25565");
+/// server.insert_str("name", "Minecraft Server");
+/// server.insert_bool("hideAddress", true);
+///
+/// let mut servers = Vec::new();
+/// servers.push(server);
+///
+/// let mut root_tag = CompoundTag::new();
+/// root_tag.insert_compound_tag_vec("servers", servers);
+///
+/// let mut vec = Vec::new();
+/// write_compound_tag(&mut vec, root_tag).unwrap();
+/// ```
 pub fn write_compound_tag<W: Write>(
     writer: &mut W,
     compound_tag: CompoundTag,
