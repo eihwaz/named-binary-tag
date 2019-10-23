@@ -210,10 +210,10 @@ impl CompoundTag {
             .insert(name.to_owned(), Tag::String(value.to_owned()));
     }
 
-    pub fn get_str<'a>(&'a self, name: &'a str) -> Result<String, CompoundTagError<'a>> {
+    pub fn get_str<'a>(&'a self, name: &'a str) -> Result<&str, CompoundTagError<'a>> {
         match self.tags.get(name) {
             Some(tag) => match tag {
-                Tag::String(value) => Ok(value.to_owned()),
+                Tag::String(value) => Ok(value),
                 actual_tag => Err(CompoundTagError::TagWrongType { name, actual_tag }),
             },
             None => Err(CompoundTagError::TagNotFound { name }),
