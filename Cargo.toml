@@ -8,6 +8,7 @@ license = "MIT"
 homepage = "https://github.com/eihwaz/named-binary-tag"
 repository = "https://github.com/eihwaz/named-binary-tag"
 keywords = ["minecraft", "nbt", "io"]
+readme = "README.md"
 
 [lib]
 name = "nbt"
