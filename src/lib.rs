@@ -614,3 +614,22 @@ fn test_level_display() {
 
     assert_eq!(root_tag.to_string(), include_str!("../test/text/level.txt"));
 }
+
+#[test]
+fn test_is_empty() {
+    let mut compound_tag = CompoundTag::new();
+    assert!(compound_tag.is_empty());
+
+    compound_tag.insert_i32("test", 123);
+    assert!(!compound_tag.is_empty());
+}
+
+#[test]
+fn test_contains_key() {
+    let mut compound_tag = CompoundTag::new();
+    assert!(!compound_tag.contains_key("test"));
+
+    compound_tag.insert_i32("test", 123);
+    assert!(compound_tag.contains_key("test"));
+    assert!(!compound_tag.contains_key("test2"));
+}
