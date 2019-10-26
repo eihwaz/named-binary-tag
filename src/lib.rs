@@ -183,6 +183,10 @@ impl CompoundTag {
         self.tags.is_empty()
     }
 
+    pub fn contains_key(&self, name: &str) -> bool {
+        self.tags.contains_key(name)
+    }
+
     define_primitive_type!(i8, Byte, get_i8, insert_i8);
     define_primitive_type!(i16, Short, get_i16, insert_i16);
     define_primitive_type!(i32, Int, get_i32, insert_i32);
