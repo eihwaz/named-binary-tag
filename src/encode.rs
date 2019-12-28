@@ -56,7 +56,7 @@ pub fn write_compound_tag<W: Write>(
     writer.write_u8(tag.type_id())?;
 
     match name {
-        Some(value) => write_string(writer, value.to_owned())?,
+        Some(value) => write_string(writer, value.into_owned())?,
         None => write_string(writer, String::from(""))?,
     }
 

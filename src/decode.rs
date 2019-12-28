@@ -10,8 +10,8 @@ use std::io::Read;
 pub enum TagDecodeError {
     /// Root of tag must be compound tag.
     RootMustBeCompoundTag {
-        /// Actual tag.
-        actual_tag: Tag,
+        /// Actual tag type id.
+        actual_tag_type_id: u8,
     },
     /// Tag type not recognized.
     UnknownTagType {
@@ -60,22 +60,26 @@ pub fn read_zlib_compound_tag<R: Read>(reader: &mut R) -> Result<CompoundTag, Ta
 /// assert_eq!(name, "Minecraft Server");
 /// assert!(hide_address);
 /// ```
-pub fn read_compound_tag<'a, R: Read>(reader: &mut R) -> Result<CompoundTag, TagDecodeError> {
+pub fn read_compound_tag<'a, 'b, R: Read>(
+    reader: &'a mut R,
+) -> Result<CompoundTag<'b>, TagDecodeError> {
     let tag_id = reader.read_u8()?;
     let name = read_string(reader)?;
-    let tag = read_tag(tag_id, Some(name.as_str()), reader)?;
+    let tag = read_tag(tag_id, Some(name), reader)?;
 
     match tag {
         Tag::Compound(value) => Ok(value),
-        actual_tag => Err(TagDecodeError::RootMustBeCompoundTag { actual_tag }),
+        _ => Err(TagDecodeError::RootMustBeCompoundTag {
+            actual_tag_type_id: tag_id,
+        }),
     }
 }
 
-fn read_tag<R: Read>(
+fn read_tag<'a, 'b, R: Read>(
     tag_id: u8,
-    name: Option<&str>,
-    reader: &mut R,
-) -> Result<Tag, TagDecodeError> {
+    name: Option<String>,
+    reader: &'a mut R,
+) -> Result<Tag<'b>, TagDecodeError> {
     match tag_id {
         1 => {
             let value = reader.read_i8()?;
@@ -145,7 +149,7 @@ fn read_tag<R: Read>(
                 }
 
                 let name = read_string(reader)?;
-                let tag = read_tag(tag_id, Some(name.as_str()), reader)?;
+                let tag = read_tag(tag_id, Some(name.clone()), reader)?;
 
                 tags.insert(name, tag);
             }
