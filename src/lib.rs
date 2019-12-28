@@ -109,7 +109,7 @@ impl Tag<'_> {
 #[derive(Debug, Clone)]
 pub struct CompoundTag<'a> {
     pub name: Option<Cow<'a, str>>,
-    tags: LinkedHashMap<String, Tag<'a>>,
+    tags: LinkedHashMap<Cow<'a, str>, Tag<'a>>,
 }
 
 /// Possible types of errors while trying to get value from compound tag.
@@ -123,8 +123,8 @@ pub enum CompoundTagError {
 
 macro_rules! define_primitive_type (
     ($type: ident, $tag: ident, $getter_name: ident, $setter_name: ident) => (
-        pub fn $setter_name(&mut self, name: &str, value: $type) {
-            self.tags.insert(name.to_owned(), Tag::$tag(value));
+        pub fn $setter_name(&mut self, name: &'a str, value: $type) {
+            self.tags.insert(Cow::Borrowed(name), Tag::$tag(value));
         }
 
         pub fn $getter_name(&self, name: &str) -> Result<$type, CompoundTagError> {
@@ -141,8 +141,8 @@ macro_rules! define_primitive_type (
 
 macro_rules! define_array_type (
     ($type: ident, $tag: ident, $getter_name: ident, $setter_name: ident) => (
-        pub fn $setter_name(&mut self, name: &str, value: Vec<$type>) {
-            self.tags.insert(name.to_owned(), Tag::$tag(value));
+        pub fn $setter_name(&mut self, name: &'a str, value: Vec<$type>) {
+            self.tags.insert(Cow::Borrowed(name), Tag::$tag(value));
         }
 
         pub fn $getter_name(&self, name: &str) -> Result<&Vec<$type>, CompoundTagError> {
@@ -190,7 +190,7 @@ impl<'a> CompoundTag<'a> {
     define_array_type!(i32, IntArray, get_i32_vec, insert_i32_vec);
     define_array_type!(i64, LongArray, get_i64_vec, insert_i64_vec);
 
-    pub fn insert_bool(&mut self, name: &str, value: bool) {
+    pub fn insert_bool(&mut self, name: &'a str, value: bool) {
         if value {
             self.insert_i8(name, 1);
         } else {
@@ -202,9 +202,9 @@ impl<'a> CompoundTag<'a> {
         Ok(self.get_i8(name)? == 1)
     }
 
-    pub fn insert_str(&mut self, name: &str, value: &str) {
+    pub fn insert_str(&mut self, name: &'a str, value: &str) {
         self.tags
-            .insert(name.to_owned(), Tag::String(value.to_owned()));
+            .insert(Cow::Borrowed(name), Tag::String(value.to_owned()));
     }
 
     pub fn get_str(&self, name: &str) -> Result<&str, CompoundTagError> {
@@ -217,8 +217,8 @@ impl<'a> CompoundTag<'a> {
         }
     }
 
-    pub fn insert_compound_tag(&mut self, name: &str, value: CompoundTag<'a>) {
-        self.tags.insert(name.to_owned(), Tag::Compound(value));
+    pub fn insert_compound_tag(&mut self, name: &'a str, value: CompoundTag<'a>) {
+        self.tags.insert(Cow::Borrowed(name), Tag::Compound(value));
     }
 
     pub fn get_compound_tag(&self, name: &str) -> Result<&CompoundTag<'a>, CompoundTagError> {
@@ -241,14 +241,14 @@ impl<'a> CompoundTag<'a> {
         }
     }
 
-    pub fn insert_str_vec(&mut self, name: &str, vec: Vec<&str>) {
+    pub fn insert_str_vec(&mut self, name: &'a str, vec: Vec<&str>) {
         let mut tags = Vec::new();
 
         for value in vec {
             tags.push(Tag::String(value.to_owned()));
         }
 
-        self.tags.insert(name.to_owned(), Tag::List(tags));
+        self.tags.insert(Cow::Borrowed(name), Tag::List(tags));
     }
 
     pub fn get_str_vec<'b>(&'b self, name: &'b str) -> Result<Vec<&str>, CompoundTagError> {
@@ -265,14 +265,14 @@ impl<'a> CompoundTag<'a> {
         Ok(vec)
     }
 
-    pub fn insert_compound_tag_vec(&mut self, name: &str, vec: Vec<CompoundTag<'a>>) {
+    pub fn insert_compound_tag_vec(&mut self, name: &'a str, vec: Vec<CompoundTag<'a>>) {
         let mut tags = Vec::new();
 
         for value in vec {
             tags.push(Tag::Compound(value));
         }
 
-        self.tags.insert(name.to_owned(), Tag::List(tags));
+        self.tags.insert(Cow::Borrowed(name), Tag::List(tags));
     }
 
     pub fn get_compound_tag_vec(
@@ -334,7 +334,7 @@ fn fmt_tag(f: &mut Formatter, name: Option<&str>, tag: &Tag, indent: usize) -> R
             fmt_list_start(f, type_name, name_ref, length)?;
 
             for (name, tag) in &value.tags {
-                fmt_tag(f, Some(name.as_str()), tag, indent + 2)?;
+                fmt_tag(f, Some(&name), tag, indent + 2)?;
             }
 
             if length > 0 {

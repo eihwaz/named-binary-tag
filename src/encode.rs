@@ -51,14 +51,11 @@ pub fn write_compound_tag<W: Write>(
     writer: &mut W,
     compound_tag: CompoundTag,
 ) -> Result<(), Error> {
-    let name = compound_tag.name.clone();
-    let tag = Tag::Compound(compound_tag);
-    writer.write_u8(tag.type_id())?;
+    let name = compound_tag.name.as_deref().unwrap_or("");
+    let tag = Tag::Compound(compound_tag.clone());
 
-    match name {
-        Some(value) => write_string(writer, value.into_owned())?,
-        None => write_string(writer, String::from(""))?,
-    }
+    writer.write_u8(tag.type_id())?;
+    write_string(writer, name)?;
 
     write_tag(writer, tag)
 }
@@ -78,7 +75,7 @@ fn write_tag<W: Write>(writer: &mut W, tag: Tag) -> Result<(), Error> {
                 writer.write_i8(v)?;
             }
         }
-        Tag::String(value) => write_string(writer, value)?,
+        Tag::String(value) => write_string(writer, &value)?,
         Tag::List(value) => {
             if value.len() > 0 {
                 writer.write_u8(value[0].type_id())?;
@@ -96,7 +93,7 @@ fn write_tag<W: Write>(writer: &mut W, tag: Tag) -> Result<(), Error> {
         Tag::Compound(value) => {
             for (name, tag) in value.tags {
                 writer.write_u8(tag.type_id())?;
-                write_string(writer, name)?;
+                write_string(writer, &name)?;
                 write_tag(writer, tag)?;
             }
 
@@ -122,7 +119,7 @@ fn write_tag<W: Write>(writer: &mut W, tag: Tag) -> Result<(), Error> {
     Ok(())
 }
 
-fn write_string<W: Write>(writer: &mut W, value: String) -> Result<(), Error> {
+fn write_string<W: Write>(writer: &mut W, value: &str) -> Result<(), Error> {
     writer.write_u16::<BigEndian>(value.len() as u16)?;
     writer.write(value.as_bytes())?;
 

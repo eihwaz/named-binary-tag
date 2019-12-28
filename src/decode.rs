@@ -151,7 +151,7 @@ fn read_tag<'a, 'b, R: Read>(
                 let name = read_string(reader)?;
                 let tag = read_tag(tag_id, Some(name.clone()), reader)?;
 
-                tags.insert(name, tag);
+                tags.insert(name.into(), tag);
             }
 
             let compound_tag = CompoundTag {
