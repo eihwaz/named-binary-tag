@@ -295,8 +295,7 @@ impl<'a> CompoundTag<'a> {
 
 impl Display for CompoundTag<'_> {
     fn fmt(&self, f: &mut Formatter<'_>) -> Result<(), Error> {
-        let name_ref = self.name.as_ref().map(|x| &**x);
-        fmt_tag(f, name_ref, &Tag::Compound(self.clone()), 0)
+        fmt_tag(f, self.name.as_deref(), &Tag::Compound(self.clone()), 0)
     }
 }
 
@@ -328,7 +327,7 @@ fn fmt_tag(f: &mut Formatter, name: Option<&str>, tag: &Tag, indent: usize) -> R
             }
         }
         Tag::Compound(value) => {
-            let name_ref = name.as_ref().map(|x| &**x);
+            let name_ref = name.as_deref();
             let length = value.tags.len();
 
             fmt_list_start(f, type_name, name_ref, length)?;
