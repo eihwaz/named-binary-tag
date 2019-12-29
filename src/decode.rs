@@ -124,7 +124,7 @@ fn read_tag<'a, 'b, R: Read>(
         8 => {
             let value = read_string(reader)?;
 
-            return Ok(Tag::String(value));
+            return Ok(Tag::String(value.into()));
         }
         9 => {
             let list_tags_id = reader.read_u8()?;

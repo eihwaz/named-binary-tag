@@ -63,7 +63,7 @@ pub enum Tag<'a> {
     Float(f32),
     Double(f64),
     ByteArray(Vec<i8>),
-    String(String),
+    String(Cow<'a, str>),
     List(Vec<Tag<'a>>),
     Compound(CompoundTag<'a>),
     IntArray(Vec<i32>),
@@ -202,9 +202,9 @@ impl<'a> CompoundTag<'a> {
         Ok(self.get_i8(name)? == 1)
     }
 
-    pub fn insert_str(&mut self, name: &'a str, value: &str) {
+    pub fn insert_str(&mut self, name: &'a str, value: &'a str) {
         self.tags
-            .insert(Cow::Borrowed(name), Tag::String(value.to_owned()));
+            .insert(Cow::Borrowed(name), Tag::String(Cow::Borrowed(value)));
     }
 
     pub fn get_str(&self, name: &str) -> Result<&str, CompoundTagError> {
@@ -241,11 +241,11 @@ impl<'a> CompoundTag<'a> {
         }
     }
 
-    pub fn insert_str_vec(&mut self, name: &'a str, vec: Vec<&str>) {
+    pub fn insert_str_vec(&mut self, name: &'a str, vec: Vec<&'a str>) {
         let mut tags = Vec::new();
 
         for value in vec {
-            tags.push(Tag::String(value.to_owned()));
+            tags.push(Tag::String(Cow::Borrowed(value)));
         }
 
         self.tags.insert(Cow::Borrowed(name), Tag::List(tags));
