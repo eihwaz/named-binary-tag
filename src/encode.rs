@@ -6,7 +6,7 @@ use std::io::{Error, Write};
 /// Write a compound tag to writer using gzip compression.
 pub fn write_gzip_compound_tag<W: Write>(
     writer: &mut W,
-    compound_tag: CompoundTag,
+    compound_tag: &CompoundTag,
 ) -> Result<(), Error> {
     write_compound_tag(
         &mut GzEncoder::new(writer, Default::default()),
@@ -17,7 +17,7 @@ pub fn write_gzip_compound_tag<W: Write>(
 /// Write a compound tag to writer using zlib compression.
 pub fn write_zlib_compound_tag<W: Write>(
     writer: &mut W,
-    compound_tag: CompoundTag,
+    compound_tag: &CompoundTag,
 ) -> Result<(), Error> {
     write_compound_tag(
         &mut ZlibEncoder::new(writer, Default::default()),
@@ -45,18 +45,17 @@ pub fn write_zlib_compound_tag<W: Write>(
 /// root_tag.insert_compound_tag_vec("servers", servers);
 ///
 /// let mut vec = Vec::new();
-/// write_compound_tag(&mut vec, root_tag).unwrap();
+/// write_compound_tag(&mut vec, &root_tag).unwrap();
 /// ```
 pub fn write_compound_tag<W: Write>(
     writer: &mut W,
-    compound_tag: CompoundTag,
+    compound_tag: &CompoundTag,
 ) -> Result<(), Error> {
     let name = compound_tag.name.as_deref().unwrap_or("");
     let tag = Tag::Compound(compound_tag.clone());
 
     writer.write_u8(tag.type_id())?;
     write_string(writer, name)?;
-
     write_tag(writer, tag)
 }
 
@@ -132,7 +131,7 @@ fn test_hello_world_write() {
     hello_world.insert_str("name", "Bananrama");
 
     let mut vec = Vec::new();
-    write_compound_tag(&mut vec, hello_world).unwrap();
+    write_compound_tag(&mut vec, &hello_world).unwrap();
 
     assert_eq!(
         vec,
@@ -155,7 +154,7 @@ fn test_servers_write() {
     root_tag.insert_compound_tag_vec("servers", servers);
 
     let mut vec = Vec::new();
-    write_compound_tag(&mut vec, root_tag).unwrap();
+    write_compound_tag(&mut vec, &root_tag).unwrap();
 
     assert_eq!(vec, include_bytes!("../test/binary/servers.dat").to_vec());
 }
