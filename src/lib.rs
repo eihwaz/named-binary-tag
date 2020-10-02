@@ -301,6 +301,57 @@ impl CompoundTag {
 
         Ok(vec)
     }
+
+    pub fn iter(&self) -> impl DoubleEndedIterator<Item=(&String, &Tag)> {
+        self.tags.iter()
+    }
+
+    pub fn iter_mut(&mut self) -> impl DoubleEndedIterator<Item=(&String, &mut Tag)> {
+        self.tags.iter_mut()
+    }
+}
+
+pub struct IntoIter(linked_hash_map::IntoIter<String, Tag>);
+
+impl Iterator for IntoIter {
+    type Item = (String, Tag);
+
+    fn next(&mut self) -> Option<Self::Item> {
+        self.0.next()
+    }
+}
+
+impl DoubleEndedIterator for IntoIter {
+    fn next_back(&mut self) -> Option<Self::Item> {
+        self.0.next_back()
+    }
+}
+
+impl IntoIterator for CompoundTag {
+    type Item = (String, Tag);
+    type IntoIter = IntoIter;
+
+    fn into_iter(self) -> Self::IntoIter {
+        IntoIter(self.tags.into_iter())
+    }
+}
+
+impl std::iter::FromIterator<(String, Tag)> for CompoundTag {
+    fn from_iter<T: IntoIterator<Item = (String, Tag)>>(iter: T) -> Self {
+        CompoundTag {
+            name: None,
+            tags: iter.into_iter().collect()
+        }
+    }
+}
+
+impl<'a> std::iter::FromIterator<(&'a str, Tag)> for CompoundTag {
+    fn from_iter<T: IntoIterator<Item = (&'a str, Tag)>>(iter: T) -> Self {
+        CompoundTag {
+            name: None,
+            tags: iter.into_iter().map(|(name, tag)|(name.into(), tag)).collect()
+        }
+    }
 }
 
 impl Display for CompoundTag {
@@ -632,4 +683,46 @@ fn test_contains_key() {
     compound_tag.insert_i32("test", 123);
     assert!(compound_tag.contains_key("test"));
     assert!(!compound_tag.contains_key("test2"));
+}
+
+#[test]
+fn test_iter() {
+    // Test from_iter
+    let mut compound: CompoundTag = vec![
+        ("test1", Tag::Int(1)),
+        ("test2", Tag::Int(2)),
+        ("test3", Tag::Int(3)),
+    ].into_iter().collect();
+
+    // Test iter
+    {
+        let mut iter = compound.iter().map(|(name, tag)|
+            (name.as_str(), match tag { Tag::Int(value) => *value, _ => panic!() })
+        );
+        assert_eq!(iter.next(), Some(("test1", 1)));
+        assert_eq!(iter.next(), Some(("test2", 2)));
+        assert_eq!(iter.next(), Some(("test3", 3)));
+        assert_eq!(iter.next(), None);
+    }
+
+    // Test iter_mut
+    for (name, tag) in compound.iter_mut() {
+        if name == "test2" {
+            match tag {
+                Tag::Int(value) => *value = 10,
+                _ => panic!()
+            }
+        }
+    }
+
+    // Test into_iter
+    {
+        let mut iter = compound.into_iter().map(|(name, tag)|
+            (name, match tag { Tag::Int(value) => value, _ => panic!() })
+        );
+        assert_eq!(iter.next(), Some((String::from("test1"), 1)));
+        assert_eq!(iter.next(), Some((String::from("test2"), 10)));
+        assert_eq!(iter.next(), Some((String::from("test3"), 3)));
+        assert_eq!(iter.next(), None);
+    }
 }
