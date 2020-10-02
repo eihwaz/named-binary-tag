@@ -48,6 +48,7 @@
 //! ```
 use linked_hash_map::LinkedHashMap;
 use std::fmt::{Debug, Display, Error, Formatter};
+use std::convert::{TryFrom, TryInto};
 
 pub mod decode;
 pub mod encode;
@@ -87,7 +88,7 @@ impl Tag {
         }
     }
 
-    fn type_name(&self) -> &str {
+    fn type_name(&self) -> &'static str {
         match self {
             Tag::Byte(_) => "TAG_Byte",
             Tag::Short(_) => "TAG_Short",
@@ -104,6 +105,86 @@ impl Tag {
         }
     }
 }
+
+macro_rules! impl_from_for_copy {
+    ($type: ty, $tag: ident) => {
+        impl From<$type> for Tag {
+            fn from(data: $type) -> Self {
+                Tag::$tag(data)
+            }
+        }
+
+        impl<'a> TryFrom<&'a Tag> for $type {
+            // Using a &'static str (tag name) of i8 (tag id) as Error would have fit better,
+            // but we need the tag as ref so we can construct a CompoundTagError
+            // when we mutably borrow a tag.
+            type Error = &'a Tag;
+
+            fn try_from(tag: &'a Tag) -> Result<Self, Self::Error> {
+                match tag {
+                    Tag::$tag(value) => Ok(*value),
+                    actual_tag => Err(actual_tag),
+                }
+            }
+        }
+
+        impl<'a> TryFrom<&'a mut Tag> for &'a mut $type {
+            type Error = &'a Tag;
+
+            fn try_from(tag: &'a mut Tag) -> Result<&mut$type, Self::Error> {
+                match tag {
+                    Tag::$tag(value) => Ok(value),
+                    actual_tag => Err(actual_tag),
+                }
+            }
+        }
+    };
+}
+
+macro_rules! impl_from_for_ref {
+    ($type: ty, $tag: ident) => {
+        impl From<$type> for Tag {
+            fn from(data: $type) -> Self {
+                Tag::$tag(data)
+            }
+        }
+
+        impl<'a> TryFrom<&'a Tag> for &'a $type {
+            type Error = &'a Tag;
+
+            fn try_from(tag: &'a Tag) -> Result<&$type, Self::Error> {
+                match tag {
+                    Tag::$tag(value) => Ok(value),
+                    actual_tag => Err(actual_tag),
+                }
+            }
+        }
+
+        impl<'a> TryFrom<&'a mut Tag> for &'a mut $type {
+            type Error = &'a Tag;
+
+            fn try_from(tag: &'a mut Tag) -> Result<&mut$type, Self::Error> {
+                match tag {
+                    Tag::$tag(value) => Ok(value),
+                    actual_tag => Err(actual_tag),
+                }
+            }
+        }
+    };
+}
+
+impl_from_for_copy!(i8, Byte);
+impl_from_for_copy!(i16, Short);
+impl_from_for_copy!(i32, Int);
+impl_from_for_copy!(i64, Long);
+impl_from_for_copy!(f32, Float);
+impl_from_for_copy!(f64, Double);
+impl_from_for_ref!(Vec<i8>, ByteArray);
+impl_from_for_ref!(String, String);
+impl_from_for_ref!(Vec<Tag>, List);
+impl_from_for_ref!(CompoundTag, Compound);
+impl_from_for_ref!(Vec<i32>, IntArray);
+impl_from_for_ref!(Vec<i64>, LongArray);
 
 #[derive(Debug, Clone)]
 pub struct CompoundTag {
@@ -185,6 +266,32 @@ impl CompoundTag {
 
     pub fn contains_key(&self, name: &str) -> bool {
         self.tags.contains_key(name)
+    }
+
+    pub fn insert(&mut self, name: impl ToString, tag: impl Into<Tag>) {
+        self.tags.insert(name.to_string(), tag.into());
+    }
+
+    pub fn get<'a, 'b: 'a, T: TryFrom<&'a Tag>>(&'a mut self, name: &'b str) -> Result<T, CompoundTagError> {
+        match self.tags.get(name) {
+            Some(tag) => match tag.try_into() {
+                Ok(value) => Ok(value),
+                Err(..) => Err(CompoundTagError::TagWrongType { name, actual_tag: tag }),
+            },
+            None => Err(CompoundTagError::TagNotFound { name })
+        }
+    }
+
+    pub fn get_mut<'a, 'b, T>(&'a mut self, name: &'b str) -> Result<T, CompoundTagError>
+    where 'b: 'a, T: TryFrom<&'a mut Tag, Error=&'a Tag>
+    {
+        match self.tags.get_mut(name) {
+            Some(tag) => match tag.try_into() {
+                Ok(value) => Ok(value),
+                Err(actual_tag) => Err(CompoundTagError::TagWrongType { name, actual_tag })
+            },
+            None => Err(CompoundTagError::TagNotFound { name })
+        }
     }
 
     define_primitive_type!(i8, Byte, get_i8, insert_i8);
