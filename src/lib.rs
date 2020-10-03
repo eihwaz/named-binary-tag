@@ -245,6 +245,34 @@ macro_rules! define_array_type (
    );
 );
 
+macro_rules! define_list_type (
+    ($type: ident, $tag: ident, $getter_name: ident, $setter_name: ident) => (
+        pub fn $setter_name(&mut self, name: &str, vec: Vec<$type>) {
+            let mut tags = Vec::new();
+
+            for value in vec {
+                tags.push(Tag::$tag(value));
+            }
+
+            self.tags.insert(name.to_owned(), Tag::List(tags));
+        }
+
+        pub fn $getter_name<'a>(&'a self, name: &'a str) -> Result<Vec<$type>, CompoundTagError<'a>> {
+            let tags = self.get_vec(name)?;
+            let mut vec = Vec::new();
+
+             for tag in tags {
+                 match tag {
+                     Tag::$tag(value) => vec.push(*value),
+                     actual_tag => return Err(CompoundTagError::TagWrongType { name, actual_tag }),
+                 }
+             }
+
+             Ok(vec)
+        }
+   );
+);
+
 impl CompoundTag {
     pub fn new() -> Self {
         CompoundTag {
@@ -303,6 +331,9 @@ impl CompoundTag {
     define_array_type!(i8, ByteArray, get_i8_vec, insert_i8_vec);
     define_array_type!(i32, IntArray, get_i32_vec, insert_i32_vec);
     define_array_type!(i64, LongArray, get_i64_vec, insert_i64_vec);
+    define_list_type!(i16, Short, get_i16_vec, insert_i16_vec);
+    define_list_type!(f32, Float, get_f32_vec, insert_f32_vec);
+    define_list_type!(f64, Double, get_f64_vec, insert_f64_vec);
 
     pub fn insert_bool(&mut self, name: &str, value: bool) {
         if value {
