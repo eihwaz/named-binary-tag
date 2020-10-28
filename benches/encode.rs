@@ -9,7 +9,7 @@ fn hello_world_write(c: &mut Criterion) {
     c.bench_function("Bench hello world write", |b| {
         b.iter(|| {
             let mut vec = Vec::new();
-            write_compound_tag(&mut vec, hello_world.clone()).expect("Failed to write tag data");
+            write_compound_tag(&mut vec, &hello_world).expect("Failed to write tag data");
         });
     });
 }
@@ -30,7 +30,7 @@ fn servers_list_write(c: &mut Criterion) {
     c.bench_function("Bench servers list write", |b| {
         b.iter(|| {
             let mut vec = Vec::new();
-            write_compound_tag(&mut vec, root_tag.clone()).expect("Failed to write tag data");
+            write_compound_tag(&mut vec, &root_tag).expect("Failed to write tag data");
         });
     });
 }

@@ -6,7 +6,7 @@ use std::io::{Error, Write};
 /// Write a compound tag to writer using gzip compression.
 pub fn write_gzip_compound_tag<W: Write>(
     writer: &mut W,
-    compound_tag: CompoundTag,
+    compound_tag: &CompoundTag,
 ) -> Result<(), Error> {
     write_compound_tag(
         &mut GzEncoder::new(writer, Default::default()),
@@ -17,7 +17,7 @@ pub fn write_gzip_compound_tag<W: Write>(
 /// Write a compound tag to writer using zlib compression.
 pub fn write_zlib_compound_tag<W: Write>(
     writer: &mut W,
-    compound_tag: CompoundTag,
+    compound_tag: &CompoundTag,
 ) -> Result<(), Error> {
     write_compound_tag(
         &mut ZlibEncoder::new(writer, Default::default()),
@@ -45,37 +45,47 @@ pub fn write_zlib_compound_tag<W: Write>(
 /// root_tag.insert_compound_tag_vec("servers", servers);
 ///
 /// let mut vec = Vec::new();
-/// write_compound_tag(&mut vec, root_tag).unwrap();
+/// write_compound_tag(&mut vec, &root_tag).unwrap();
 /// ```
 pub fn write_compound_tag<W: Write>(
     writer: &mut W,
-    compound_tag: CompoundTag,
+    compound_tag: &CompoundTag,
 ) -> Result<(), Error> {
-    let name = compound_tag.name.clone();
-    let tag = Tag::Compound(compound_tag);
-    writer.write_u8(tag.type_id())?;
+    // Tag id
+    writer.write_u8(Tag::Compound(CompoundTag::new()).type_id())?;
+    
+    write_string(writer, compound_tag.name.as_deref().unwrap_or(""))?;
 
-    match name {
-        Some(value) => write_string(writer, value.to_owned())?,
-        None => write_string(writer, String::from(""))?,
-    }
-
-    write_tag(writer, tag)
+    write_inner_compound_tag(writer, compound_tag)
 }
 
-fn write_tag<W: Write>(writer: &mut W, tag: Tag) -> Result<(), Error> {
+pub fn write_inner_compound_tag<W: Write>(
+    writer: &mut W,
+    compound_tag: &CompoundTag,
+) -> Result<(), Error> {
+    for (name, tag) in &compound_tag.tags {
+        writer.write_u8(tag.type_id())?;
+        write_string(writer, name)?;
+        write_tag(writer, tag)?;
+    }
+
+    // To mark compound tag end.
+    writer.write_u8(0)
+}
+
+fn write_tag<W: Write>(writer: &mut W, tag: &Tag) -> Result<(), Error> {
     match tag {
-        Tag::Byte(value) => writer.write_i8(value)?,
-        Tag::Short(value) => writer.write_i16::<BigEndian>(value)?,
-        Tag::Int(value) => writer.write_i32::<BigEndian>(value)?,
-        Tag::Long(value) => writer.write_i64::<BigEndian>(value)?,
-        Tag::Float(value) => writer.write_f32::<BigEndian>(value)?,
-        Tag::Double(value) => writer.write_f64::<BigEndian>(value)?,
+        Tag::Byte(value) => writer.write_i8(*value)?,
+        Tag::Short(value) => writer.write_i16::<BigEndian>(*value)?,
+        Tag::Int(value) => writer.write_i32::<BigEndian>(*value)?,
+        Tag::Long(value) => writer.write_i64::<BigEndian>(*value)?,
+        Tag::Float(value) => writer.write_f32::<BigEndian>(*value)?,
+        Tag::Double(value) => writer.write_f64::<BigEndian>(*value)?,
         Tag::ByteArray(value) => {
             writer.write_u32::<BigEndian>(value.len() as u32)?;
 
             for v in value {
-                writer.write_i8(v)?;
+                writer.write_i8(*v)?;
             }
         }
         Tag::String(value) => write_string(writer, value)?,
@@ -93,28 +103,19 @@ fn write_tag<W: Write>(writer: &mut W, tag: Tag) -> Result<(), Error> {
                 write_tag(writer, tag)?;
             }
         }
-        Tag::Compound(value) => {
-            for (name, tag) in value.tags {
-                writer.write_u8(tag.type_id())?;
-                write_string(writer, name)?;
-                write_tag(writer, tag)?;
-            }
-
-            // To mark compound tag end.
-            writer.write_u8(0)?;
-        }
+        Tag::Compound(value) => write_inner_compound_tag(writer, value)?,
         Tag::IntArray(value) => {
             writer.write_u32::<BigEndian>(value.len() as u32)?;
 
             for v in value {
-                writer.write_i32::<BigEndian>(v)?;
+                writer.write_i32::<BigEndian>(*v)?;
             }
         }
         Tag::LongArray(value) => {
             writer.write_u32::<BigEndian>(value.len() as u32)?;
 
             for v in value {
-                writer.write_i64::<BigEndian>(v)?;
+                writer.write_i64::<BigEndian>(*v)?;
             }
         }
     }
@@ -122,7 +123,7 @@ fn write_tag<W: Write>(writer: &mut W, tag: Tag) -> Result<(), Error> {
     Ok(())
 }
 
-fn write_string<W: Write>(writer: &mut W, value: String) -> Result<(), Error> {
+fn write_string<W: Write>(writer: &mut W, value: &str) -> Result<(), Error> {
     writer.write_u16::<BigEndian>(value.len() as u16)?;
     writer.write(value.as_bytes())?;
 
@@ -135,7 +136,7 @@ fn test_hello_world_write() {
     hello_world.insert_str("name", "Bananrama");
 
     let mut vec = Vec::new();
-    write_compound_tag(&mut vec, hello_world).unwrap();
+    write_compound_tag(&mut vec, &hello_world).unwrap();
 
     assert_eq!(
         vec,
@@ -158,7 +159,7 @@ fn test_servers_write() {
     root_tag.insert_compound_tag_vec("servers", servers);
 
     let mut vec = Vec::new();
-    write_compound_tag(&mut vec, root_tag).unwrap();
+    write_compound_tag(&mut vec, &root_tag).unwrap();
 
     assert_eq!(vec, include_bytes!("../test/binary/servers.dat").to_vec());
 }
