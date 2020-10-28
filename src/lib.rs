@@ -47,7 +47,7 @@
 //! let string = root_tag.to_string();
 //! // Write NBT
 //! let mut vec = Vec::new();
-//! write_compound_tag(&mut vec, root_tag).unwrap();
+//! write_compound_tag(&mut vec, &root_tag).unwrap();
 //! ```
 use linked_hash_map::LinkedHashMap;
 use std::fmt::{Debug, Display, Error, Formatter};
