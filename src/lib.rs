@@ -43,11 +43,11 @@
 //! let mut root_tag = CompoundTag::new();
 //! root_tag.insert_compound_tag_vec("servers", servers);
 //!
+//! // Write stringified NBT as accepted by Minecraft commands
+//! let string = root_tag.to_string();
 //! // Write NBT
 //! let mut vec = Vec::new();
 //! write_compound_tag(&mut vec, root_tag).unwrap();
-//! // Write stringified NBT as accepted by Minecraft commands
-//! let string = root_tag.to_string();
 //! ```
 use linked_hash_map::LinkedHashMap;
 use std::fmt::{Debug, Display, Error, Formatter};
