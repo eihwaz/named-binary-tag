@@ -43,8 +43,11 @@
 //! let mut root_tag = CompoundTag::new();
 //! root_tag.insert_compound_tag_vec("servers", servers);
 //!
+//! // Write NBT
 //! let mut vec = Vec::new();
 //! write_compound_tag(&mut vec, root_tag).unwrap();
+//! // Write stringified NBT as accepted by Minecraft commands
+//! let string = root_tag.to_string();
 //! ```
 use linked_hash_map::LinkedHashMap;
 use std::fmt::{Debug, Display, Error, Formatter};
@@ -186,7 +189,7 @@ impl_from_for_ref!(CompoundTag, Compound);
 impl_from_for_ref!(Vec<i32>, IntArray);
 impl_from_for_ref!(Vec<i64>, LongArray);
 
-#[derive(Debug, Clone)]
+#[derive(Clone)]
 pub struct CompoundTag {
     pub name: Option<String>,
     tags: LinkedHashMap<String, Tag>,
@@ -492,7 +495,7 @@ impl<'a> std::iter::FromIterator<(&'a str, Tag)> for CompoundTag {
     }
 }
 
-impl Display for CompoundTag {
+impl Debug for CompoundTag {
     fn fmt(&self, f: &mut Formatter<'_>) -> Result<(), Error> {
         let name_ref = self.name.as_ref().map(|x| &**x);
         fmt_tag(f, name_ref, &Tag::Compound(self.clone()), 0)
@@ -595,6 +598,51 @@ fn fmt_str_opt(name: Option<&str>) -> &str {
         None => "",
     }
 }
+
+impl Display for CompoundTag {
+    fn fmt(&self, f: &mut Formatter<'_>) -> Result<(), Error> {
+        // Ignore self.name because it isn't accepted by Minecraft
+        // We can't use f.debug_struct() because that would use child Debug, not Display
+        write!(f, "{{")?;
+        let mut first = true;
+        for (name, value) in &self.tags {
+            write!(f, "{}{:?}:{}", if first {""} else {","}, name, value)?;
+            first = false;
+        }
+        write!(f, "}}")
+    }
+}
+
+// Display NBT in SNBT format
+impl Display for Tag {
+    fn fmt(&self, f: &mut Formatter<'_>) -> Result<(), Error> {
+        fn format_list<T: Display>(f: &mut Formatter<'_>, type_header: &'static str, list: &Vec<T>) -> Result<(), Error> {
+            write!(f, "[{}", type_header)?;
+            let mut first = true;
+            for elem in list {
+                write!(f, "{}{}", if first {""} else {","}, elem)?;
+                first = false;
+            }
+            write!(f, "]")
+        }
+        match self {
+            Tag::Byte(data)    => write!(f, "{}b", data),
+            Tag::Short(data)  => write!(f, "{}s", data),
+            Tag::Int(data)    => write!(f, "{}",  data),
+            Tag::Long(data)   => write!(f, "{}l", data),
+            Tag::Float(data)  => write!(f, "{}f", data),
+            Tag::Double(data) => write!(f, "{}d", data),
+            Tag::ByteArray(data) => format_list(f, "B;", data),
+            Tag::String(data) => write!(f, "{:?}", data),
+            Tag::List(data) => format_list(f, "", data),
+            Tag::Compound(data) => write!(f, "{}", data),
+            Tag::IntArray(data) => format_list(f, "I;", data),
+            Tag::LongArray(data) => format_list(f, "L;", data),
+        }
+    }
+}
+
+
 
 #[test]
 fn test_compound_tag_i8() {
@@ -751,57 +799,53 @@ fn test_compound_tag_nested_compound_tag_vec() {
     assert_eq!(get_nested_compound_tag_2.get_i32("i32").unwrap(), 222333111);
 }
 
+
 #[test]
-fn test_servers_display() {
+fn test_servers_fmt() {
     use crate::decode::read_compound_tag;
     use std::io::Cursor;
 
     let mut cursor = Cursor::new(include_bytes!("../test/binary/servers.dat").to_vec());
     let root_tag = read_compound_tag(&mut cursor).unwrap();
 
-    assert_eq!(
-        root_tag.to_string(),
-        include_str!("../test/text/servers.txt")
-    );
+    assert_eq!(&format!("{}", root_tag), include_str!("../test/text/servers.snbt"));
+    assert_eq!(&format!("{:?}", root_tag), include_str!("../test/text/servers.txt"));
 }
 
 #[test]
-fn test_hello_world_display() {
+fn test_hello_world_fmt() {
     use crate::decode::read_compound_tag;
     use std::io::Cursor;
 
     let mut cursor = Cursor::new(include_bytes!("../test/binary/hello_world.dat").to_vec());
     let root_tag = read_compound_tag(&mut cursor).unwrap();
 
-    assert_eq!(
-        root_tag.to_string(),
-        include_str!("../test/text/hello_world.txt")
-    );
+    assert_eq!(&format!("{}", root_tag), include_str!("../test/text/hello_world.snbt"));
+    assert_eq!(&format!("{:?}", root_tag), include_str!("../test/text/hello_world.txt"));
 }
 
 #[test]
-fn test_player_display() {
+fn test_player_fmt() {
     use crate::decode::read_gzip_compound_tag;
     use std::io::Cursor;
 
     let mut cursor = Cursor::new(include_bytes!("../test/binary/player.dat").to_vec());
     let root_tag = read_gzip_compound_tag(&mut cursor).unwrap();
 
-    assert_eq!(
-        root_tag.to_string(),
-        include_str!("../test/text/player.txt")
-    );
+    assert_eq!(&format!("{}", root_tag), include_str!("../test/text/player.snbt"));
+    assert_eq!(&format!("{:?}", root_tag), include_str!("../test/text/player.txt"));
 }
 
 #[test]
-fn test_level_display() {
+fn test_level_fmt() {
     use crate::decode::read_gzip_compound_tag;
     use std::io::Cursor;
 
     let mut cursor = Cursor::new(include_bytes!("../test/binary/level.dat").to_vec());
     let root_tag = read_gzip_compound_tag(&mut cursor).unwrap();
 
-    assert_eq!(root_tag.to_string(), include_str!("../test/text/level.txt"));
+    assert_eq!(&format!("{}", root_tag), include_str!("../test/text/level.snbt"));
+    assert_eq!(&format!("{:?}", root_tag), include_str!("../test/text/level.txt"));
 }
 
 #[test]
