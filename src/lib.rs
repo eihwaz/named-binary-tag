@@ -214,8 +214,8 @@ pub enum CompoundTagError<'a> {
 
 macro_rules! define_primitive_type (
     ($type: ident, $tag: ident, $getter_name: ident, $setter_name: ident) => (
-        pub fn $setter_name(&mut self, name: &str, value: $type) {
-            self.tags.insert(name.to_owned(), Tag::$tag(value));
+        pub fn $setter_name(&mut self, name: impl ToString, value: $type) {
+            self.tags.insert(name.to_string(), Tag::$tag(value));
         }
 
         pub fn $getter_name<'a>(&'a self, name: &'a str) -> Result<$type, CompoundTagError<'a>> {
@@ -232,8 +232,8 @@ macro_rules! define_primitive_type (
 
 macro_rules! define_array_type (
     ($type: ident, $tag: ident, $getter_name: ident, $setter_name: ident) => (
-        pub fn $setter_name(&mut self, name: &str, value: Vec<$type>) {
-            self.tags.insert(name.to_owned(), Tag::$tag(value));
+        pub fn $setter_name(&mut self, name: impl ToString, value: Vec<$type>) {
+            self.tags.insert(name.to_string(), Tag::$tag(value));
         }
 
         pub fn $getter_name<'a>(&'a self, name: &'a str) -> Result<&Vec<$type>, CompoundTagError<'a>> {
@@ -250,14 +250,14 @@ macro_rules! define_array_type (
 
 macro_rules! define_list_type (
     ($type: ident, $tag: ident, $getter_name: ident, $setter_name: ident) => (
-        pub fn $setter_name(&mut self, name: &str, vec: Vec<$type>) {
+        pub fn $setter_name(&mut self, name: impl ToString, vec: impl IntoIterator<Item=$type>) {
             let mut tags = Vec::new();
 
             for value in vec {
                 tags.push(Tag::$tag(value));
             }
 
-            self.tags.insert(name.to_owned(), Tag::List(tags));
+            self.tags.insert(name.to_string(), Tag::List(tags));
         }
 
         pub fn $getter_name<'a>(&'a self, name: &'a str) -> Result<Vec<$type>, CompoundTagError<'a>> {
@@ -284,9 +284,9 @@ impl CompoundTag {
         }
     }
 
-    pub fn named(name: &str) -> Self {
+    pub fn named(name: impl ToString) -> Self {
         CompoundTag {
-            name: Some(name.to_owned()),
+            name: Some(name.to_string()),
             tags: LinkedHashMap::new(),
         }
     }
@@ -350,9 +350,9 @@ impl CompoundTag {
         Ok(self.get_i8(name)? == 1)
     }
 
-    pub fn insert_str(&mut self, name: &str, value: &str) {
+    pub fn insert_str(&mut self, name: impl ToString, value: impl ToString) {
         self.tags
-            .insert(name.to_owned(), Tag::String(value.to_owned()));
+            .insert(name.to_string(), Tag::String(value.to_string()));
     }
 
     pub fn get_str<'a>(&'a self, name: &'a str) -> Result<&str, CompoundTagError<'a>> {
@@ -365,8 +365,8 @@ impl CompoundTag {
         }
     }
 
-    pub fn insert_compound_tag(&mut self, name: &str, value: CompoundTag) {
-        self.tags.insert(name.to_owned(), Tag::Compound(value));
+    pub fn insert_compound_tag(&mut self, name: impl ToString, value: CompoundTag) {
+        self.tags.insert(name.to_string(), Tag::Compound(value));
     }
 
     pub fn get_compound_tag<'a>(
@@ -392,14 +392,14 @@ impl CompoundTag {
         }
     }
 
-    pub fn insert_str_vec(&mut self, name: &str, vec: Vec<&str>) {
+    pub fn insert_str_vec(&mut self, name: impl ToString, vec: impl IntoIterator<Item=impl ToString>) {
         let mut tags = Vec::new();
 
         for value in vec {
-            tags.push(Tag::String(value.to_owned()));
+            tags.push(Tag::String(value.to_string()));
         }
 
-        self.tags.insert(name.to_owned(), Tag::List(tags));
+        self.tags.insert(name.to_string(), Tag::List(tags));
     }
 
     pub fn get_str_vec<'a>(&'a self, name: &'a str) -> Result<Vec<&str>, CompoundTagError<'a>> {
@@ -416,14 +416,14 @@ impl CompoundTag {
         Ok(vec)
     }
 
-    pub fn insert_compound_tag_vec(&mut self, name: &str, vec: Vec<CompoundTag>) {
+    pub fn insert_compound_tag_vec(&mut self, name: impl ToString, vec: impl IntoIterator<Item=CompoundTag>) {
         let mut tags = Vec::new();
 
         for value in vec {
             tags.push(Tag::Compound(value));
         }
 
-        self.tags.insert(name.to_owned(), Tag::List(tags));
+        self.tags.insert(name.to_string(), Tag::List(tags));
     }
 
     pub fn get_compound_tag_vec<'a>(
