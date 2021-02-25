@@ -2,8 +2,8 @@ use crate::{CompoundTag, Tag};
 use byteorder::{BigEndian, ReadBytesExt};
 use flate2::read::{GzDecoder, ZlibDecoder};
 use linked_hash_map::LinkedHashMap;
-use std::io;
-use std::io::Read;
+use std::{error::Error, io::Read};
+use std::{fmt::Display, io};
 
 /// Possible types of errors while decoding tag.
 #[derive(Debug)]
@@ -25,6 +25,29 @@ pub enum TagDecodeError {
 impl From<io::Error> for TagDecodeError {
     fn from(io_error: io::Error) -> Self {
         TagDecodeError::IOError { io_error }
+    }
+}
+
+impl Error for TagDecodeError {
+    fn source(&self) -> Option<&(dyn Error + 'static)> {
+        match self {
+            TagDecodeError::IOError { io_error } => Some(io_error),
+            _ => None,
+        }
+    }
+}
+
+impl Display for TagDecodeError {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            Self::RootMustBeCompoundTag { actual_tag } => write!(
+                f,
+                "Root must be a TAG_Compound but is a {}",
+                actual_tag.type_name()
+            ),
+            Self::UnknownTagType { tag_type_id } => write!(f, "Unknown tag type: {}", tag_type_id),
+            Self::IOError { .. } => write!(f, "IO Error"),
+        }
     }
 }
 

@@ -50,8 +50,11 @@
 //! write_compound_tag(&mut vec, &root_tag).unwrap();
 //! ```
 use linked_hash_map::LinkedHashMap;
-use std::fmt::{Debug, Display, Error, Formatter};
-use std::convert::{TryFrom, TryInto};
+use std::fmt::{Debug, Display, Formatter};
+use std::{
+    convert::{TryFrom, TryInto},
+    fmt,
+};
 
 pub mod decode;
 pub mod encode;
@@ -212,6 +215,23 @@ pub enum CompoundTagError<'a> {
     },
 }
 
+impl<'a> std::error::Error for CompoundTagError<'a> {
+    fn source(&self) -> Option<&(dyn std::error::Error + 'static)> {
+        None
+    }
+}
+
+impl<'a> Display for CompoundTagError<'a> {
+    fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
+        match self {
+            CompoundTagError::TagNotFound { name } => write!(f, "Tag {} not found", name),
+            CompoundTagError::TagWrongType { name, actual_tag } => {
+                write!(f, "Tag {} has type {}", name, actual_tag.type_name())
+            }
+        }
+    }
+}
+
 macro_rules! define_primitive_type (
     ($type: ident, $tag: ident, $getter_name: ident, $setter_name: ident) => (
         pub fn $setter_name(&mut self, name: impl ToString, value: $type) {
@@ -303,25 +323,33 @@ impl CompoundTag {
         self.tags.insert(name.to_string(), tag.into());
     }
 
-    pub fn get<'a, 'b: 'a, T: TryFrom<&'a Tag>>(&'a mut self, name: &'b str) -> Result<T, CompoundTagError> {
+    pub fn get<'a, 'b: 'a, T: TryFrom<&'a Tag>>(
+        &'a mut self,
+        name: &'b str,
+    ) -> Result<T, CompoundTagError> {
         match self.tags.get(name) {
             Some(tag) => match tag.try_into() {
                 Ok(value) => Ok(value),
-                Err(..) => Err(CompoundTagError::TagWrongType { name, actual_tag: tag }),
+                Err(..) => Err(CompoundTagError::TagWrongType {
+                    name,
+                    actual_tag: tag,
+                }),
             },
-            None => Err(CompoundTagError::TagNotFound { name })
+            None => Err(CompoundTagError::TagNotFound { name }),
         }
     }
 
     pub fn get_mut<'a, 'b, T>(&'a mut self, name: &'b str) -> Result<T, CompoundTagError>
-    where 'b: 'a, T: TryFrom<&'a mut Tag, Error=&'a Tag>
+    where
+        'b: 'a,
+        T: TryFrom<&'a mut Tag, Error = &'a Tag>,
     {
         match self.tags.get_mut(name) {
             Some(tag) => match tag.try_into() {
                 Ok(value) => Ok(value),
-                Err(actual_tag) => Err(CompoundTagError::TagWrongType { name, actual_tag })
+                Err(actual_tag) => Err(CompoundTagError::TagWrongType { name, actual_tag }),
             },
-            None => Err(CompoundTagError::TagNotFound { name })
+            None => Err(CompoundTagError::TagNotFound { name }),
         }
     }
 
@@ -392,7 +420,11 @@ impl CompoundTag {
         }
     }
 
-    pub fn insert_str_vec(&mut self, name: impl ToString, vec: impl IntoIterator<Item=impl ToString>) {
+    pub fn insert_str_vec(
+        &mut self,
+        name: impl ToString,
+        vec: impl IntoIterator<Item = impl ToString>,
+    ) {
         let mut tags = Vec::new();
 
         for value in vec {
@@ -416,7 +448,11 @@ impl CompoundTag {
         Ok(vec)
     }
 
-    pub fn insert_compound_tag_vec(&mut self, name: impl ToString, vec: impl IntoIterator<Item=CompoundTag>) {
+    pub fn insert_compound_tag_vec(
+        &mut self,
+        name: impl ToString,
+        vec: impl IntoIterator<Item = CompoundTag>,
+    ) {
         let mut tags = Vec::new();
 
         for value in vec {
@@ -443,11 +479,11 @@ impl CompoundTag {
         Ok(vec)
     }
 
-    pub fn iter(&self) -> impl DoubleEndedIterator<Item=(&String, &Tag)> {
+    pub fn iter(&self) -> impl DoubleEndedIterator<Item = (&String, &Tag)> {
         self.tags.iter()
     }
 
-    pub fn iter_mut(&mut self) -> impl DoubleEndedIterator<Item=(&String, &mut Tag)> {
+    pub fn iter_mut(&mut self) -> impl DoubleEndedIterator<Item = (&String, &mut Tag)> {
         self.tags.iter_mut()
     }
 }
@@ -481,7 +517,7 @@ impl std::iter::FromIterator<(String, Tag)> for CompoundTag {
     fn from_iter<T: IntoIterator<Item = (String, Tag)>>(iter: T) -> Self {
         CompoundTag {
             name: None,
-            tags: iter.into_iter().collect()
+            tags: iter.into_iter().collect(),
         }
     }
 }
@@ -490,19 +526,27 @@ impl<'a> std::iter::FromIterator<(&'a str, Tag)> for CompoundTag {
     fn from_iter<T: IntoIterator<Item = (&'a str, Tag)>>(iter: T) -> Self {
         CompoundTag {
             name: None,
-            tags: iter.into_iter().map(|(name, tag)|(name.into(), tag)).collect()
+            tags: iter
+                .into_iter()
+                .map(|(name, tag)| (name.into(), tag))
+                .collect(),
         }
     }
 }
 
 impl Debug for CompoundTag {
-    fn fmt(&self, f: &mut Formatter<'_>) -> Result<(), Error> {
+    fn fmt(&self, f: &mut Formatter<'_>) -> Result<(), fmt::Error> {
         let name_ref = self.name.as_ref().map(|x| &**x);
         fmt_tag(f, name_ref, &Tag::Compound(self.clone()), 0)
     }
 }
 
-fn fmt_tag(f: &mut Formatter, name: Option<&str>, tag: &Tag, indent: usize) -> Result<(), Error> {
+fn fmt_tag(
+    f: &mut Formatter,
+    name: Option<&str>,
+    tag: &Tag,
+    indent: usize,
+) -> Result<(), fmt::Error> {
     fmt_indent(f, indent)?;
 
     let type_name = tag.type_name();
@@ -555,7 +599,7 @@ fn fmt_simple_tag<V: Display>(
     type_name: &str,
     name: Option<&str>,
     value: V,
-) -> Result<(), Error> {
+) -> Result<(), fmt::Error> {
     writeln!(f, "{}('{}'): '{}'", type_name, fmt_str_opt(name), value)
 }
 
@@ -564,7 +608,7 @@ fn fmt_array_tag<V: Debug>(
     type_name: &str,
     name: Option<&str>,
     value: V,
-) -> Result<(), Error> {
+) -> Result<(), fmt::Error> {
     writeln!(f, "{}('{}'): '{:?}'", type_name, fmt_str_opt(name), value)
 }
 
@@ -573,7 +617,7 @@ fn fmt_list_start(
     type_name: &str,
     name: Option<&str>,
     length: usize,
-) -> Result<(), Error> {
+) -> Result<(), fmt::Error> {
     let fmt_name = fmt_str_opt(name);
 
     match length {
@@ -583,12 +627,12 @@ fn fmt_list_start(
     }
 }
 
-fn fmt_list_end(f: &mut Formatter, indent: usize) -> Result<(), Error> {
+fn fmt_list_end(f: &mut Formatter, indent: usize) -> Result<(), fmt::Error> {
     fmt_indent(f, indent)?;
     writeln!(f, "}}")
 }
 
-fn fmt_indent(f: &mut Formatter, indent: usize) -> Result<(), Error> {
+fn fmt_indent(f: &mut Formatter, indent: usize) -> Result<(), fmt::Error> {
     write!(f, "{:indent$}", "", indent = indent)
 }
 
@@ -600,13 +644,13 @@ fn fmt_str_opt(name: Option<&str>) -> &str {
 }
 
 impl Display for CompoundTag {
-    fn fmt(&self, f: &mut Formatter<'_>) -> Result<(), Error> {
+    fn fmt(&self, f: &mut Formatter<'_>) -> Result<(), fmt::Error> {
         // Ignore self.name because it isn't accepted by Minecraft
         // We can't use f.debug_struct() because that would use child Debug, not Display
         write!(f, "{{")?;
         let mut first = true;
         for (name, value) in &self.tags {
-            write!(f, "{}{:?}:{}", if first {""} else {","}, name, value)?;
+            write!(f, "{}{:?}:{}", if first { "" } else { "," }, name, value)?;
             first = false;
         }
         write!(f, "}}")
@@ -615,22 +659,26 @@ impl Display for CompoundTag {
 
 // Display NBT in SNBT format
 impl Display for Tag {
-    fn fmt(&self, f: &mut Formatter<'_>) -> Result<(), Error> {
-        fn format_list<T: Display>(f: &mut Formatter<'_>, type_header: &'static str, list: &Vec<T>) -> Result<(), Error> {
+    fn fmt(&self, f: &mut Formatter<'_>) -> Result<(), fmt::Error> {
+        fn format_list<T: Display>(
+            f: &mut Formatter<'_>,
+            type_header: &'static str,
+            list: &Vec<T>,
+        ) -> Result<(), fmt::Error> {
             write!(f, "[{}", type_header)?;
             let mut first = true;
             for elem in list {
-                write!(f, "{}{}", if first {""} else {","}, elem)?;
+                write!(f, "{}{}", if first { "" } else { "," }, elem)?;
                 first = false;
             }
             write!(f, "]")
         }
         match self {
-            Tag::Byte(data)    => write!(f, "{}b", data),
-            Tag::Short(data)  => write!(f, "{}s", data),
-            Tag::Int(data)    => write!(f, "{}",  data),
-            Tag::Long(data)   => write!(f, "{}l", data),
-            Tag::Float(data)  => write!(f, "{}f", data),
+            Tag::Byte(data) => write!(f, "{}b", data),
+            Tag::Short(data) => write!(f, "{}s", data),
+            Tag::Int(data) => write!(f, "{}", data),
+            Tag::Long(data) => write!(f, "{}l", data),
+            Tag::Float(data) => write!(f, "{}f", data),
             Tag::Double(data) => write!(f, "{}d", data),
             Tag::ByteArray(data) => format_list(f, "B;", data),
             Tag::String(data) => write!(f, "{:?}", data),
@@ -641,8 +689,6 @@ impl Display for Tag {
         }
     }
 }
-
-
 
 #[test]
 fn test_compound_tag_i8() {
@@ -799,7 +845,6 @@ fn test_compound_tag_nested_compound_tag_vec() {
     assert_eq!(get_nested_compound_tag_2.get_i32("i32").unwrap(), 222333111);
 }
 
-
 #[test]
 fn test_servers_fmt() {
     use crate::decode::read_compound_tag;
@@ -808,8 +853,14 @@ fn test_servers_fmt() {
     let mut cursor = Cursor::new(include_bytes!("../test/binary/servers.dat").to_vec());
     let root_tag = read_compound_tag(&mut cursor).unwrap();
 
-    assert_eq!(&format!("{}", root_tag), include_str!("../test/text/servers.snbt"));
-    assert_eq!(&format!("{:?}", root_tag), include_str!("../test/text/servers.txt"));
+    assert_eq!(
+        &format!("{}", root_tag),
+        include_str!("../test/text/servers.snbt")
+    );
+    assert_eq!(
+        &format!("{:?}", root_tag),
+        include_str!("../test/text/servers.txt")
+    );
 }
 
 #[test]
@@ -820,8 +871,14 @@ fn test_hello_world_fmt() {
     let mut cursor = Cursor::new(include_bytes!("../test/binary/hello_world.dat").to_vec());
     let root_tag = read_compound_tag(&mut cursor).unwrap();
 
-    assert_eq!(&format!("{}", root_tag), include_str!("../test/text/hello_world.snbt"));
-    assert_eq!(&format!("{:?}", root_tag), include_str!("../test/text/hello_world.txt"));
+    assert_eq!(
+        &format!("{}", root_tag),
+        include_str!("../test/text/hello_world.snbt")
+    );
+    assert_eq!(
+        &format!("{:?}", root_tag),
+        include_str!("../test/text/hello_world.txt")
+    );
 }
 
 #[test]
@@ -832,8 +889,14 @@ fn test_player_fmt() {
     let mut cursor = Cursor::new(include_bytes!("../test/binary/player.dat").to_vec());
     let root_tag = read_gzip_compound_tag(&mut cursor).unwrap();
 
-    assert_eq!(&format!("{}", root_tag), include_str!("../test/text/player.snbt"));
-    assert_eq!(&format!("{:?}", root_tag), include_str!("../test/text/player.txt"));
+    assert_eq!(
+        &format!("{}", root_tag),
+        include_str!("../test/text/player.snbt")
+    );
+    assert_eq!(
+        &format!("{:?}", root_tag),
+        include_str!("../test/text/player.txt")
+    );
 }
 
 #[test]
@@ -844,8 +907,14 @@ fn test_level_fmt() {
     let mut cursor = Cursor::new(include_bytes!("../test/binary/level.dat").to_vec());
     let root_tag = read_gzip_compound_tag(&mut cursor).unwrap();
 
-    assert_eq!(&format!("{}", root_tag), include_str!("../test/text/level.snbt"));
-    assert_eq!(&format!("{:?}", root_tag), include_str!("../test/text/level.txt"));
+    assert_eq!(
+        &format!("{}", root_tag),
+        include_str!("../test/text/level.snbt")
+    );
+    assert_eq!(
+        &format!("{:?}", root_tag),
+        include_str!("../test/text/level.txt")
+    );
 }
 
 #[test]
@@ -874,13 +943,21 @@ fn test_iter() {
         ("test1", Tag::Int(1)),
         ("test2", Tag::Int(2)),
         ("test3", Tag::Int(3)),
-    ].into_iter().collect();
+    ]
+    .into_iter()
+    .collect();
 
     // Test iter
     {
-        let mut iter = compound.iter().map(|(name, tag)|
-            (name.as_str(), match tag { Tag::Int(value) => *value, _ => panic!() })
-        );
+        let mut iter = compound.iter().map(|(name, tag)| {
+            (
+                name.as_str(),
+                match tag {
+                    Tag::Int(value) => *value,
+                    _ => panic!(),
+                },
+            )
+        });
         assert_eq!(iter.next(), Some(("test1", 1)));
         assert_eq!(iter.next(), Some(("test2", 2)));
         assert_eq!(iter.next(), Some(("test3", 3)));
@@ -892,16 +969,22 @@ fn test_iter() {
         if name == "test2" {
             match tag {
                 Tag::Int(value) => *value = 10,
-                _ => panic!()
+                _ => panic!(),
             }
         }
     }
 
     // Test into_iter
     {
-        let mut iter = compound.into_iter().map(|(name, tag)|
-            (name, match tag { Tag::Int(value) => value, _ => panic!() })
-        );
+        let mut iter = compound.into_iter().map(|(name, tag)| {
+            (
+                name,
+                match tag {
+                    Tag::Int(value) => value,
+                    _ => panic!(),
+                },
+            )
+        });
         assert_eq!(iter.next(), Some((String::from("test1"), 1)));
         assert_eq!(iter.next(), Some((String::from("test2"), 10)));
         assert_eq!(iter.next(), Some((String::from("test3"), 3)));
