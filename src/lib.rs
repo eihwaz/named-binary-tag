@@ -323,7 +323,7 @@ impl CompoundTag {
         self.tags.insert(name.to_string(), tag.into());
     }
 
-    pub fn get<'a, 'b: 'a, T: TryFrom<&'a Tag>>(&'a mut self, name: &'b str) -> Result<T, CompoundTagError> {
+    pub fn get<'a, 'b: 'a, T: TryFrom<&'a Tag>>(&'a self, name: &'b str) -> Result<T, CompoundTagError> {
         match self.tags.get(name) {
             Some(tag) => match tag.try_into() {
                 Ok(value) => Ok(value),
