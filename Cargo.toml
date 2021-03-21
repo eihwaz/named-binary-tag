@@ -1,6 +1,6 @@
 [package]
 name = "named-binary-tag"
-version = "0.5.0"
+version = "0.6.0"
 authors = ["vagola <vladislavs.golubs@yandex.ru>"]
 description = "Format is used by minecraft for the various files in which it saves data"
 edition = "2018"
