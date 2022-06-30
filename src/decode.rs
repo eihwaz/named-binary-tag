@@ -83,7 +83,7 @@ pub fn read_zlib_compound_tag<R: Read>(reader: &mut R) -> Result<CompoundTag, Ta
 /// assert_eq!(name, "Minecraft Server");
 /// assert!(hide_address);
 /// ```
-pub fn read_compound_tag<'a, R: Read>(reader: &mut R) -> Result<CompoundTag, TagDecodeError> {
+pub fn read_compound_tag<R: Read>(reader: &mut R) -> Result<CompoundTag, TagDecodeError> {
     let tag_id = reader.read_u8()?;
     let name = read_string(reader)?;
     let tag = read_tag(tag_id, Some(name.as_str()), reader)?;
@@ -103,32 +103,32 @@ fn read_tag<R: Read>(
         1 => {
             let value = reader.read_i8()?;
 
-            return Ok(Tag::Byte(value));
+            Ok(Tag::Byte(value))
         }
         2 => {
             let value = reader.read_i16::<BigEndian>()?;
 
-            return Ok(Tag::Short(value));
+            Ok(Tag::Short(value))
         }
         3 => {
             let value = reader.read_i32::<BigEndian>()?;
 
-            return Ok(Tag::Int(value));
+            Ok(Tag::Int(value))
         }
         4 => {
             let value = reader.read_i64::<BigEndian>()?;
 
-            return Ok(Tag::Long(value));
+            Ok(Tag::Long(value))
         }
         5 => {
             let value = reader.read_f32::<BigEndian>()?;
 
-            return Ok(Tag::Float(value));
+            Ok(Tag::Float(value))
         }
         6 => {
             let value = reader.read_f64::<BigEndian>()?;
 
-            return Ok(Tag::Double(value));
+            Ok(Tag::Double(value))
         }
         7 => {
             let length = reader.read_u32::<BigEndian>()?;
@@ -138,12 +138,12 @@ fn read_tag<R: Read>(
                 value.push(reader.read_i8()?);
             }
 
-            return Ok(Tag::ByteArray(value));
+            Ok(Tag::ByteArray(value))
         }
         8 => {
             let value = read_string(reader)?;
 
-            return Ok(Tag::String(value));
+            Ok(Tag::String(value))
         }
         9 => {
             let list_tags_id = reader.read_u8()?;
@@ -154,7 +154,7 @@ fn read_tag<R: Read>(
                 value.push(read_tag(list_tags_id, None, reader)?);
             }
 
-            return Ok(Tag::List(value));
+            Ok(Tag::List(value))
         }
         10 => {
             let mut tags = LinkedHashMap::new();
@@ -178,7 +178,7 @@ fn read_tag<R: Read>(
                 tags,
             };
 
-            return Ok(Tag::Compound(compound_tag));
+            Ok(Tag::Compound(compound_tag))
         }
         11 => {
             let length = reader.read_u32::<BigEndian>()?;
@@ -188,7 +188,7 @@ fn read_tag<R: Read>(
                 value.push(reader.read_i32::<BigEndian>()?);
             }
 
-            return Ok(Tag::IntArray(value));
+            Ok(Tag::IntArray(value))
         }
         12 => {
             let length = reader.read_u32::<BigEndian>()?;
@@ -198,9 +198,9 @@ fn read_tag<R: Read>(
                 value.push(reader.read_i64::<BigEndian>()?);
             }
 
-            return Ok(Tag::LongArray(value));
+            Ok(Tag::LongArray(value))
         }
-        tag_type_id => return Err(TagDecodeError::UnknownTagType { tag_type_id }),
+        tag_type_id => Err(TagDecodeError::UnknownTagType { tag_type_id }),
     }
 }
 
@@ -245,6 +245,7 @@ fn test_servers_read() {
 }
 
 #[test]
+#[allow(clippy::excessive_precision)]
 fn test_big_test_read() {
     use std::io::Cursor;
 
