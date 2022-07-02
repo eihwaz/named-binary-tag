@@ -53,7 +53,7 @@ pub fn write_compound_tag<W: Write>(
 ) -> Result<(), Error> {
     // Tag id
     writer.write_u8(Tag::Compound(CompoundTag::new()).type_id())?;
-    
+
     write_string(writer, compound_tag.name.as_deref().unwrap_or(""))?;
 
     write_inner_compound_tag(writer, compound_tag)
@@ -90,7 +90,7 @@ fn write_tag<W: Write>(writer: &mut W, tag: &Tag) -> Result<(), Error> {
         }
         Tag::String(value) => write_string(writer, value)?,
         Tag::List(value) => {
-            if value.len() > 0 {
+            if !value.is_empty() {
                 writer.write_u8(value[0].type_id())?;
             } else {
                 // Empty list type.
@@ -125,7 +125,7 @@ fn write_tag<W: Write>(writer: &mut W, tag: &Tag) -> Result<(), Error> {
 
 fn write_string<W: Write>(writer: &mut W, value: &str) -> Result<(), Error> {
     writer.write_u16::<BigEndian>(value.len() as u16)?;
-    writer.write(value.as_bytes())?;
+    writer.write_all(value.as_bytes())?;
 
     Ok(())
 }
@@ -152,8 +152,7 @@ fn test_servers_write() {
     server.insert_str("name", "Minecraft Server");
     server.insert_bool("hideAddress", true);
 
-    let mut servers = Vec::new();
-    servers.push(server);
+    let servers = vec![server];
 
     let mut root_tag = CompoundTag::new();
     root_tag.insert_compound_tag_vec("servers", servers);

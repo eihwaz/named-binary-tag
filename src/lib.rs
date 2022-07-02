@@ -192,7 +192,7 @@ impl_from_for_ref!(CompoundTag, Compound);
 impl_from_for_ref!(Vec<i32>, IntArray);
 impl_from_for_ref!(Vec<i64>, LongArray);
 
-#[derive(Clone)]
+#[derive(Clone, Default)]
 pub struct CompoundTag {
     pub name: Option<String>,
     tags: LinkedHashMap<String, Tag>,
@@ -298,10 +298,7 @@ macro_rules! define_list_type (
 
 impl CompoundTag {
     pub fn new() -> Self {
-        CompoundTag {
-            name: None,
-            tags: LinkedHashMap::new(),
-        }
+        CompoundTag::default()
     }
 
     pub fn named(name: impl ToString) -> Self {
@@ -539,7 +536,7 @@ impl<'a> std::iter::FromIterator<(&'a str, Tag)> for CompoundTag {
 
 impl Debug for CompoundTag {
     fn fmt(&self, f: &mut Formatter<'_>) -> Result<(), fmt::Error> {
-        let name_ref = self.name.as_ref().map(|x| &**x);
+        let name_ref = self.name.as_deref();
         fmt_tag(f, name_ref, &Tag::Compound(self.clone()), 0)
     }
 }
@@ -577,10 +574,9 @@ fn fmt_tag(
             }
         }
         Tag::Compound(value) => {
-            let name_ref = name.as_ref().map(|x| &**x);
             let length = value.tags.len();
 
-            fmt_list_start(f, type_name, name_ref, length)?;
+            fmt_list_start(f, type_name, name, length)?;
 
             for (name, tag) in &value.tags {
                 fmt_tag(f, Some(name.as_str()), tag, indent + 2)?;
