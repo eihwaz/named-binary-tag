@@ -79,34 +79,34 @@ pub enum Tag {
 impl Tag {
     fn type_id(&self) -> u8 {
         match self {
-            Tag::Byte(_) => 1,
-            Tag::Short(_) => 2,
-            Tag::Int(_) => 3,
-            Tag::Long(_) => 4,
-            Tag::Float(_) => 5,
-            Tag::Double(_) => 6,
+            Tag::Byte(_)      => 1,
+            Tag::Short(_)     => 2,
+            Tag::Int(_)       => 3,
+            Tag::Long(_)      => 4,
+            Tag::Float(_)     => 5,
+            Tag::Double(_)    => 6,
             Tag::ByteArray(_) => 7,
-            Tag::String(_) => 8,
-            Tag::List(_) => 9,
-            Tag::Compound(_) => 10,
-            Tag::IntArray(_) => 11,
+            Tag::String(_)    => 8,
+            Tag::List(_)      => 9,
+            Tag::Compound(_)  => 10,
+            Tag::IntArray(_)  => 11,
             Tag::LongArray(_) => 12,
         }
     }
 
     fn type_name(&self) -> &'static str {
         match self {
-            Tag::Byte(_) => "TAG_Byte",
-            Tag::Short(_) => "TAG_Short",
-            Tag::Int(_) => "TAG_Int",
-            Tag::Long(_) => "TAG_Long",
-            Tag::Float(_) => "TAG_Float",
-            Tag::Double(_) => "TAG_Double",
+            Tag::Byte(_)      => "TAG_Byte",
+            Tag::Short(_)     => "TAG_Short",
+            Tag::Int(_)       => "TAG_Int",
+            Tag::Long(_)      => "TAG_Long",
+            Tag::Float(_)     => "TAG_Float",
+            Tag::Double(_)    => "TAG_Double",
             Tag::ByteArray(_) => "TAG_Byte_Array",
-            Tag::String(_) => "TAG_String",
-            Tag::List(_) => "TAG_List",
-            Tag::Compound(_) => "TAG_Compound",
-            Tag::IntArray(_) => "TAG_Int_Array",
+            Tag::String(_)    => "TAG_String",
+            Tag::List(_)      => "TAG_List",
+            Tag::Compound(_)  => "TAG_Compound",
+            Tag::IntArray(_)  => "TAG_Int_Array",
             Tag::LongArray(_) => "TAG_Long_Array",
         }
     }
