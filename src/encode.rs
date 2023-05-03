@@ -1,29 +1,6 @@
 use crate::{CompoundTag, Tag};
 use byteorder::{BigEndian, WriteBytesExt};
-use flate2::write::{GzEncoder, ZlibEncoder};
 use std::io::{Error, Write};
-
-/// Write a compound tag to writer using gzip compression.
-pub fn write_gzip_compound_tag<W: Write>(
-    writer: &mut W,
-    compound_tag: &CompoundTag,
-) -> Result<(), Error> {
-    write_compound_tag(
-        &mut GzEncoder::new(writer, Default::default()),
-        compound_tag,
-    )
-}
-
-/// Write a compound tag to writer using zlib compression.
-pub fn write_zlib_compound_tag<W: Write>(
-    writer: &mut W,
-    compound_tag: &CompoundTag,
-) -> Result<(), Error> {
-    write_compound_tag(
-        &mut ZlibEncoder::new(writer, Default::default()),
-        compound_tag,
-    )
-}
 
 /// Write a compound tag to writer.
 ///

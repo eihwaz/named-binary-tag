@@ -1,6 +1,5 @@
 use crate::{CompoundTag, Tag};
 use byteorder::{BigEndian, ReadBytesExt};
-use flate2::read::{GzDecoder, ZlibDecoder};
 use linked_hash_map::LinkedHashMap;
 use std::{error::Error, io::Read};
 use std::{fmt::Display, io};
@@ -49,16 +48,6 @@ impl Display for TagDecodeError {
             Self::IOError { .. } => write!(f, "IO Error"),
         }
     }
-}
-
-/// Read a compound tag from a reader compressed with gzip.
-pub fn read_gzip_compound_tag<R: Read>(reader: &mut R) -> Result<CompoundTag, TagDecodeError> {
-    read_compound_tag(&mut GzDecoder::new(reader))
-}
-
-/// Read a compound tag from a reader compressed with zlib.
-pub fn read_zlib_compound_tag<R: Read>(reader: &mut R) -> Result<CompoundTag, TagDecodeError> {
-    read_compound_tag(&mut ZlibDecoder::new(reader))
 }
 
 /// Read a compound tag from a reader.
@@ -250,7 +239,7 @@ fn test_big_test_read() {
     use std::io::Cursor;
 
     let mut cursor = Cursor::new(include_bytes!("../test/binary/bigtest.dat").to_vec());
-    let root_tag = read_gzip_compound_tag(&mut cursor).unwrap();
+    let root_tag = read_compound_tag(&mut cursor).unwrap();
 
     assert_eq!(root_tag.name.as_ref().unwrap(), "Level");
     assert_eq!(root_tag.get_i8("byteTest").unwrap(), i8::max_value());

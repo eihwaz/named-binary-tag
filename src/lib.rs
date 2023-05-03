@@ -56,6 +56,8 @@ use std::{
     fmt,
 };
 
+#[cfg(feature = "archive")]
+pub mod archive;
 pub mod decode;
 pub mod encode;
 
@@ -882,11 +884,11 @@ fn test_hello_world_fmt() {
 
 #[test]
 fn test_player_fmt() {
-    use crate::decode::read_gzip_compound_tag;
+    use crate::decode::read_compound_tag;
     use std::io::Cursor;
 
     let mut cursor = Cursor::new(include_bytes!("../test/binary/player.dat").to_vec());
-    let root_tag = read_gzip_compound_tag(&mut cursor).unwrap();
+    let root_tag = read_compound_tag(&mut cursor).unwrap();
 
     assert_eq!(
         &format!("{}", root_tag),
@@ -900,11 +902,11 @@ fn test_player_fmt() {
 
 #[test]
 fn test_level_fmt() {
-    use crate::decode::read_gzip_compound_tag;
+    use crate::decode::read_compound_tag;
     use std::io::Cursor;
 
     let mut cursor = Cursor::new(include_bytes!("../test/binary/level.dat").to_vec());
-    let root_tag = read_gzip_compound_tag(&mut cursor).unwrap();
+    let root_tag = read_compound_tag(&mut cursor).unwrap();
 
     assert_eq!(
         &format!("{}", root_tag),

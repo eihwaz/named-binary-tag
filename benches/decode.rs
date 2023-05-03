@@ -1,5 +1,5 @@
 use criterion::{criterion_group, criterion_main, Criterion};
-use nbt::decode::{read_compound_tag, read_gzip_compound_tag};
+use nbt::decode::read_compound_tag;
 use std::io::Cursor;
 
 fn hello_world_read(c: &mut Criterion) {
@@ -30,7 +30,7 @@ fn big_test_read(c: &mut Criterion) {
     c.bench_function("Bench big test read", |b| {
         b.iter(|| {
             let mut cursor = Cursor::new(&data);
-            read_gzip_compound_tag(&mut cursor).expect("Failed to read tag data");
+            read_compound_tag(&mut cursor).expect("Failed to read tag data");
         });
     });
 }
