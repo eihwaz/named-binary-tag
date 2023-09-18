@@ -8,10 +8,10 @@ pub fn write_gzip_compound_tag<W: Write>(
     writer: &mut W,
     compound_tag: &CompoundTag,
 ) -> Result<(), Error> {
-    write_compound_tag(
-        &mut GzEncoder::new(writer, Default::default()),
-        compound_tag,
-    )
+    let mut encoder = GzEncoder::new(writer, Default::default());
+    let result = write_compound_tag(&mut encoder, compound_tag);
+    encoder.finish()?;
+    result
 }
 
 /// Write a compound tag to writer using zlib compression.
